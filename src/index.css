@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* Configuración para forzar Dark Mode por clase en Tailwind v4 */
+@variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  /* Regla 1: Normalización defensiva contra márgenes de navegador y prevención de scroll horizontal */
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+}
+
+@layer utilities {
+  /* Regla 10: Apple Scroll - Estética inmersiva */
+  .apple-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+  
+  .apple-scroll::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  
+  .apple-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .apple-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(156, 163, 175, 0.5);
+    border-radius: 9999px;
+  }
+  
+  .apple-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(107, 114, 128, 0.8);
+  }
+
+  /* Utilidad extra para el Glow Ambiental en Modales (Regla 5) */
+  .modal-glow {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 16rem;
+    height: 16rem;
+    background-color: rgba(236, 72, 153, 0.1);
+    border-radius: 9999px;
+    filter: blur(64px);
+    mix-blend-mode: screen;
+    pointer-events: none;
+  }
+}

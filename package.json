@@ -1,0 +1,29 @@
+{
+  "name": "la-burbuja-de-milo",
+  "version": "1.0.0",
+  "description": "Backend para La Burbuja de Milo en Vercel",
+  "main": "api/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.15.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.14",
+    "supabase": "^2.98.2",
+    "tailwindcss": "^4.3.0",
+    "vercel": "^53.3.2",
+    "vite": "^8.0.11"
+  }
+}
