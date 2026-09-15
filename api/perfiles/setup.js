@@ -1,11 +1,15 @@
 // POST /api/perfiles/setup
 // Para capturar los datos bio-estéticos iniciales (tipo de piel, sensibilidades)
 
-import { supabase } from '../../lib/supabaseClient.js';
+import { isSupabaseConfigured, supabase } from '../../lib/supabaseClient.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido. Usa POST.' });
+  }
+
+  if (!isSupabaseConfigured) {
+    return res.status(503).json({ error: 'Supabase aún no está configurado.' });
   }
 
   const { userId, tipo_piel, sensibilidades } = req.body;

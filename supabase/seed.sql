@@ -1,0 +1,2 @@
+-- Los datos iniciales del catalogo, CRM y blog
+-- estan en supabase/migrations/20260915120000_init.sql

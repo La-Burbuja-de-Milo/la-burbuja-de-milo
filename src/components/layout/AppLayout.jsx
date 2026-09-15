@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Moon, Sun, ShoppingBag, Sparkles, Shield, Calendar, BookOpen } from 'lucide-react';
+import { Moon, Sun, ShoppingBag, Sparkles, Shield, Calendar, BookOpen, LogIn, LogOut } from 'lucide-react';
 import { MiloStore } from '../../services/miloStore';
 import CartDrawer from '../cart/CartDrawer';
+import { useAuth } from '../../context/AuthContext';
 
 export default function AppLayout() {
+  const { session, signOut } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme');
@@ -118,6 +120,28 @@ export default function AppLayout() {
                 </span>
               )}
             </button>
+
+            {session ? (
+              <button
+                onClick={() => signOut()}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200 bg-white/70 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 active:scale-95 transition-all"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Cerrar sesión</span>
+              </button>
+            ) : (
+              <NavLink
+                to="/login"
+                className={({ isActive }) => `flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all active:scale-95 ${
+                  isActive
+                    ? 'bg-pink-600 text-white shadow-sm shadow-pink-500/30'
+                    : 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-500/20 hover:opacity-90'
+                }`}
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Iniciar sesión</span>
+              </NavLink>
+            )}
 
             {/* Enlace al Panel Admin */}
             <NavLink

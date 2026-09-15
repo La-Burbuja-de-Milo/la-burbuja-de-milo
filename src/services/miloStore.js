@@ -2,6 +2,8 @@
  * Almacén reactivo y persistente central para La Burbuja de Milo (CRM, Tienda, Citas y CMS)
  */
 
+import { hydrateFromSupabase, syncStoreKey } from './supabaseSync';
+
 const STORAGE_KEYS = {
   BANNERS: 'milo_banners',
   PASILLOS: 'milo_pasillos',
@@ -384,14 +386,19 @@ function loadData(key, seedData) {
   }
 }
 
-function saveData(key, data) {
+function saveData(key, data, { sync = true } = {}) {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(key, JSON.stringify(data));
     window.dispatchEvent(new Event('milo_store_updated'));
+    if (sync) syncStoreKey(key, data);
   } catch (err) {
     console.error(`Error al guardar ${key} en localStorage:`, err);
   }
+}
+
+export async function hydrateMiloStore() {
+  await hydrateFromSupabase((key, data) => saveData(key, data, { sync: false }));
 }
 
 export const MiloStore = {

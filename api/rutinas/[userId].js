@@ -1,11 +1,15 @@
 // GET /api/rutinas/[userId]
 // Para recuperar la rutina activa del usuario
 
-import { supabase } from '../../lib/supabaseClient.js';
+import { isSupabaseConfigured, supabase } from '../../lib/supabaseClient.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Método no permitido. Usa GET.' });
+  }
+
+  if (!isSupabaseConfigured) {
+    return res.status(503).json({ error: 'Supabase aún no está configurado.' });
   }
 
   // En Vercel, req.query.[param] te da el parámetro dinámico

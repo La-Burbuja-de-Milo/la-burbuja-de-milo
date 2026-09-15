@@ -1,11 +1,15 @@
 // POST /api/auth/login
 // Implementación de login sin contraseña (OTP) usando Supabase
 
-import { supabase } from '../../lib/supabaseClient.js';
+import { isSupabaseConfigured, supabase } from '../../lib/supabaseClient.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido. Usa POST.' });
+  }
+
+  if (!isSupabaseConfigured) {
+    return res.status(503).json({ error: 'Supabase aún no está configurado.' });
   }
 
   const { email } = req.body;

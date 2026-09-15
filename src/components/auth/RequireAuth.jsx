@@ -1,19 +1,33 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
-/**
- * Guardia de Rutas (Simulación Temporal).
- * Esto será reemplazado por el estado real de Supabase Auth más adelante.
- */
-export default function RequireAuth({ children }) {
+export default function RequireAuth({ children, adminOnly = false }) {
   const location = useLocation();
-  
-  // SIMULACIÓN: Leemos el estado del localStorage
-  const isAuthenticated = localStorage.getItem('simulated_login') === 'true';
+  const { session, isAdmin, loading, configured } = useAuth();
 
-  if (!isAuthenticated) {
-    // Redirige al login y guarda la ruta que intentaba visitar para volver a ella después
+  if (!configured) {
+    const isAuthenticated = localStorage.getItem('simulated_login') === 'true';
+    if (!isAuthenticated) {
+      return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+    return children;
+  }
+
+  if (loading) {
+    return (
+      <div className="py-16 text-center text-sm text-gray-500">
+        Cargando sesión...
+      </div>
+    );
+  }
+
+  if (!session) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (adminOnly && !isAdmin) {
+    return <Navigate to="/mi-burbuja" replace />;
   }
 
   return children;
