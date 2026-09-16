@@ -1,9 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isGerente, isStaff } from '../lib/roles';
 
 const AuthContext = createContext({
   session: null,
   profile: null,
+  rol: null,
+  isGerente: false,
+  isStaff: false,
   isAdmin: false,
   loading: true,
   configured: false,
@@ -63,7 +67,10 @@ export function AuthProvider({ children }) {
     () => ({
       session,
       profile,
-      isAdmin: profile?.rol === 'admin',
+      rol: profile?.rol || null,
+      isGerente: isGerente(profile?.rol),
+      isStaff: isStaff(profile?.rol),
+      isAdmin: isGerente(profile?.rol),
       loading,
       configured: isSupabaseConfigured,
       signOut: async () => {

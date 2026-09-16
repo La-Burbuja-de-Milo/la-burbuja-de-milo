@@ -10,6 +10,7 @@ import LoginPage from './pages/auth/LoginPage';
 import ClienteDashboard from './pages/cliente/ClienteDashboard';
 import SkincareDashboard from './pages/cliente/SkincareDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import RequireAuth from './components/auth/RequireAuth';
 import { AuthProvider } from './context/AuthContext';
 
 function App() {
@@ -25,11 +26,18 @@ function App() {
             <Route path="login" element={<LoginPage />} />
 
             <Route path="mi-burbuja">
-              <Route index element={<ClienteDashboard />} />
-              <Route path="skincare" element={<SkincareDashboard />} />
+              <Route index element={<RequireAuth><ClienteDashboard /></RequireAuth>} />
+              <Route path="skincare" element={<RequireAuth><SkincareDashboard /></RequireAuth>} />
             </Route>
 
-            <Route path="admin" element={<AdminDashboard />} />
+            <Route
+              path="admin"
+              element={(
+                <RequireAuth staffOnly>
+                  <AdminDashboard />
+                </RequireAuth>
+              )}
+            />
           </Route>
         </Routes>
       </BrowserRouter>

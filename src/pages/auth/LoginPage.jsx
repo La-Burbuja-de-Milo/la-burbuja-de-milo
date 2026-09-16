@@ -4,23 +4,32 @@ import GlassCard from '../../components/ui/GlassCard';
 import AuroraButton from '../../components/ui/AuroraButton';
 import { isSupabaseConfigured, supabase } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { homeForRole, isStaff } from '../../lib/roles';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { session } = useAuth();
+  const { session, profile, loading } = useAuth();
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const from = location.state?.from?.pathname || '/mi-burbuja';
-
   useEffect(() => {
-    if (session) {
-      navigate(from, { replace: true });
+    if (!session || loading) return;
+
+    const requested = location.state?.from?.pathname;
+    if (requested && requested !== '/login') {
+      if (requested.startsWith('/admin') && !isStaff(profile?.rol)) {
+        navigate('/mi-burbuja', { replace: true });
+        return;
+      }
+      navigate(requested, { replace: true });
+      return;
     }
-  }, [session, from, navigate]);
+
+    navigate(homeForRole(profile?.rol), { replace: true });
+  }, [session, profile, loading, location.state, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -68,7 +77,7 @@ export default function LoginPage() {
               Revisa tu correo: enviamos un enlace a <strong>{email}</strong>.
             </p>
             <p className="text-xs text-gray-500">
-              Si no llega en un minuto, mira spam. El primer usuario en entrar queda como admin.
+              Si no llega en un minuto, mira spam. El registro libre crea una cuenta de cliente; el equipo entra con la invitación del gerente.
             </p>
           </div>
         ) : (

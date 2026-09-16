@@ -4,9 +4,11 @@ import { Moon, Sun, ShoppingBag, Sparkles, Shield, Calendar, BookOpen, LogIn, Lo
 import { MiloStore } from '../../services/miloStore';
 import CartDrawer from '../cart/CartDrawer';
 import { useAuth } from '../../context/AuthContext';
+import { isGerente, isStaff } from '../../lib/roles';
 
 export default function AppLayout() {
-  const { session, signOut } = useAuth();
+  const { session, profile, signOut } = useAuth();
+  const canOpenCrm = isStaff(profile?.rol);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme');
@@ -143,18 +145,19 @@ export default function AppLayout() {
               </NavLink>
             )}
 
-            {/* Enlace al Panel Admin */}
-            <NavLink
-              to="/admin"
-              className={({ isActive }) => `flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
-                isActive
-                  ? 'bg-rose-500 text-white border-rose-500 shadow-sm shadow-rose-500/30'
-                  : 'bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/50'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Admin CRM</span>
-            </NavLink>
+            {canOpenCrm && (
+              <NavLink
+                to="/admin"
+                className={({ isActive }) => `flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
+                  isActive
+                    ? 'bg-rose-500 text-white border-rose-500 shadow-sm shadow-rose-500/30'
+                    : 'bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/40 hover:bg-rose-100 dark:hover:bg-rose-900/50'
+                }`}
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>{isGerente(profile?.rol) ? 'Panel Gerente' : 'Panel Asesor'}</span>
+              </NavLink>
+            )}
 
             {/* Toggle de Modo Oscuro */}
             <button

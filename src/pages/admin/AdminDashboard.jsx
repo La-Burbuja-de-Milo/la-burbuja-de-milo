@@ -5,6 +5,9 @@ import { generateWhatsAppUrl, WhatsAppTemplates } from '../../services/whatsappS
 import PageHeader from '../../components/ui/PageHeader';
 import GlassCard from '../../components/ui/GlassCard';
 import AuroraButton from '../../components/ui/AuroraButton';
+import EquipoTab from './components/EquipoTab';
+import { useAuth } from '../../context/AuthContext';
+import { isGerente } from '../../lib/roles';
 import { 
   LayoutDashboard, 
   ShoppingBag, 
@@ -12,6 +15,7 @@ import {
   Calendar, 
   Users, 
   BookOpen, 
+  UserCog,
   Plus, 
   Edit, 
   Trash2, 
@@ -29,7 +33,9 @@ import {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('resumen'); // 'resumen' | 'tienda' | 'banners' | 'citas' | 'crm' | 'blog'
+  const { profile } = useAuth();
+  const gerente = isGerente(profile?.rol);
+  const [activeTab, setActiveTab] = useState('resumen');
 
   // Estados de datos sincronizados
   const [productos, setProductos] = useState([]);
@@ -96,6 +102,12 @@ export default function AdminDashboard() {
     window.addEventListener('milo_store_updated', loadAll);
     return () => window.removeEventListener('milo_store_updated', loadAll);
   }, []);
+
+  useEffect(() => {
+    if (!gerente && ['tienda', 'banners', 'blog', 'equipo'].includes(activeTab)) {
+      setActiveTab('resumen');
+    }
+  }, [gerente, activeTab]);
 
   // === HANDLERS PRODUCTOS ===
   const handleOpenProductModal = (prod = null) => {
@@ -210,8 +222,10 @@ export default function AdminDashboard() {
     <div className="flex flex-col gap-6">
       {/* Encabezado Maestro */}
       <PageHeader 
-        title="Panel Administrativo & CRM" 
-        description="Gestión integral de la tienda, pasillos, banners, agenda de citas, comunicación de clientes y blog."
+        title={gerente ? 'Panel Gerente & CRM' : 'Panel Asesor'} 
+        description={gerente
+          ? 'Gestión integral de tienda, equipo, agenda, clientes y blog.'
+          : 'Agenda de citas y seguimiento de clientes.'}
         glow="admin"
         actions={
           <div className="flex items-center gap-2">
@@ -239,13 +253,14 @@ export default function AdminDashboard() {
       {/* TABS DE NAVEGACIÓN ADMINISTRATIVA */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-gray-200/60 dark:border-white/5 apple-scroll">
         {[
-          { id: 'resumen', label: 'Resumen General', icon: LayoutDashboard },
-          { id: 'tienda', label: `Tienda & Pasillos (${productos.length})`, icon: ShoppingBag },
-          { id: 'banners', label: `Banners CMS (${banners.length})`, icon: ImageIcon },
-          { id: 'citas', label: `Agenda de Citas (${citas.length})`, icon: Calendar },
-          { id: 'crm', label: `CRM Clientes (${clientes.length})`, icon: Users },
-          { id: 'blog', label: `Blog (${blogPosts.length})`, icon: BookOpen }
-        ].map((tab) => {
+          { id: 'resumen', label: 'Resumen General', icon: LayoutDashboard, staff: true },
+          { id: 'tienda', label: `Tienda & Pasillos (${productos.length})`, icon: ShoppingBag, staff: false },
+          { id: 'banners', label: `Banners CMS (${banners.length})`, icon: ImageIcon, staff: false },
+          { id: 'citas', label: `Agenda de Citas (${citas.length})`, icon: Calendar, staff: true },
+          { id: 'crm', label: `CRM Clientes (${clientes.length})`, icon: Users, staff: true },
+          { id: 'blog', label: `Blog (${blogPosts.length})`, icon: BookOpen, staff: false },
+          { id: 'equipo', label: 'Cuentas y roles', icon: UserCog, staff: false }
+        ].filter((tab) => gerente || tab.staff).map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
@@ -758,6 +773,8 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {activeTab === 'equipo' && gerente && <EquipoTab />}
 
       {/* MODAL CREAR/EDITAR PRODUCTO */}
       {isProductModalOpen && (
