@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { MiloStore } from '../../services/miloStore';
 import ProductCard from '../../components/shop/ProductCard';
+import ProductDetail, { pickVarianteId } from '../../components/shop/ProductDetail';
 import ProductVisual from '../../components/shop/ProductVisual';
 import { BannerStage } from '../../components/shop/BannerFrame';
 import { BANNER_PHOTO_SLOT_CLASS, bannerMatClass, findBannerTransicion } from '../../lib/bannerFrames';
@@ -67,6 +68,9 @@ export default function LandingPage() {
   const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
   const [paused, setPaused] = useState(false);
   const [productos, setProductos] = useState([]);
+  const [pasillos, setPasillos] = useState([]);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedVarianteId, setSelectedVarianteId] = useState('');
   const [servicios, setServicios] = useState([]);
   const [blogPosts, setBlogPosts] = useState([]);
   const [productTab, setProductTab] = useState('bestsellers');
@@ -81,6 +85,7 @@ export default function LandingPage() {
   const loadData = () => {
     setBanners(MiloStore.getBanners().filter((banner) => banner.activo));
     setProductos(MiloStore.getProductos());
+    setPasillos(MiloStore.getPasillos());
     const allServicios = MiloStore.getServicios();
     const featured = [];
     ['Diagnóstico', 'Facial', 'Corporal', 'Bienestar'].forEach((categoria) => {
@@ -198,10 +203,20 @@ export default function LandingPage() {
 
   const shownProducts = tabbedProducts.length ? tabbedProducts : productos.slice(0, 8);
 
-  const handleQuickBuy = (product, tipo) => {
-    const added = MiloStore.addToCarrito(product, tipo);
+  const handleQuickBuy = (product, tipo, varianteId) => {
+    const added = MiloStore.addToCarrito(product, tipo, varianteId);
     setNotice(added ? `${product.nombre} se añadió a tu bolsa` : `No hay stock de ${product.nombre}`);
     window.setTimeout(() => setNotice(''), 2500);
+  };
+
+  const openProductDetail = (product, varianteId) => {
+    setSelectedProduct(product);
+    setSelectedVarianteId(pickVarianteId(product, varianteId));
+  };
+
+  const closeProductDetail = () => {
+    setSelectedProduct(null);
+    setSelectedVarianteId('');
   };
 
   const submitNewsletter = (event) => {
@@ -363,7 +378,7 @@ export default function LandingPage() {
               key={product.id}
               product={product}
               onQuickBuy={handleQuickBuy}
-              onOpen={() => go('/tienda')}
+              onOpen={openProductDetail}
             />
           ))}
         </div>
@@ -410,7 +425,7 @@ export default function LandingPage() {
                 key={product.id}
                 product={product}
                 onQuickBuy={handleQuickBuy}
-                onOpen={() => go('/tienda')}
+                onOpen={openProductDetail}
               />
             ))}
           </div>
@@ -489,15 +504,17 @@ export default function LandingPage() {
             .map((product) => (
             <EditHotspot key={product.id} enabled={canEditCatalog} onEdit={() => openProduct(product)}>
             <article className="flex flex-col">
-              <ProductVisual seed={`${product.id}-editorial`} src={product.imagen} variant="hero" className="h-64 w-full" />
-              <h3 className="mt-4 text-xl font-medium text-neutral-900 dark:text-white">{product.nombre}</h3>
-              <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{product.descripcion}</p>
+              <button type="button" onClick={() => openProductDetail(product)} className="text-left">
+                <ProductVisual seed={`${product.id}-editorial`} src={product.imagen} variant="hero" className="h-64 w-full" />
+                <h3 className="mt-4 text-xl font-medium text-neutral-900 dark:text-white">{product.nombre}</h3>
+                <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{product.descripcion}</p>
+              </button>
               <button
                 type="button"
-                onClick={() => go('/tienda')}
+                onClick={() => openProductDetail(product)}
                 className="mt-4 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
               >
-                Shop now <ArrowRight className="h-3.5 w-3.5" />
+                Ver ficha <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </article>
             </EditHotspot>
@@ -559,6 +576,21 @@ export default function LandingPage() {
           )}
         </div>
       </section>
+      {selectedProduct && (
+        <ProductDetail
+          product={productos.find((item) => item.id === selectedProduct.id) || selectedProduct}
+          pasillos={pasillos}
+          canEditCatalog={canEditCatalog}
+          openProduct={openProduct}
+          varianteId={selectedVarianteId}
+          onVariante={setSelectedVarianteId}
+          onClose={closeProductDetail}
+          onAdd={(product, tipo, varianteId) => {
+            handleQuickBuy(product, tipo, varianteId);
+            closeProductDetail();
+          }}
+        />
+      )}
     </div>
   );
 }
