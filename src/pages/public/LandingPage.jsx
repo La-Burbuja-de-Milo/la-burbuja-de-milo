@@ -8,15 +8,18 @@ import { BannerStage } from '../../components/shop/BannerFrame';
 import { BANNER_PHOTO_SLOT_CLASS, bannerMatClass, findBannerTransicion } from '../../lib/bannerFrames';
 import { categoryRowClass, withCategoryCircles } from '../../lib/categoryCircles';
 import { productInPasillo } from '../../lib/pasillos';
+import { normalizeRewardsStrip } from '../../lib/rewardsStrip';
+import { homeTabRowActionClass, tabRowClass, withHomeTabRows } from '../../lib/homeTabRows';
 import EditHotspot from '../../components/admin/EditHotspot';
+import RewardsStrip from '../../components/shop/RewardsStrip';
 import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
 import { withEditParam } from '../../lib/visualEdit';
 import { formatCOP } from '../../lib/money';
 
-function SectionHeader({ title, tabs, activeTab, onTab, actionLabel, onAction }) {
-  return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-      <div className={`flex items-end ${tabs ? 'min-w-0 flex-nowrap gap-2.5 sm:gap-5' : 'flex-wrap gap-5'}`}>
+function SectionHeader({ title, tabs, activeTab, onTab, actionLabel, onAction, align = 'center', editable, onEdit }) {
+  const body = (
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
+      <div className={`flex items-end ${tabs ? `hide-scrollbar min-w-0 flex-nowrap gap-2.5 overflow-x-auto sm:flex-1 sm:gap-5 ${tabRowClass(align)}` : 'flex-wrap gap-5'}`}>
         {tabs ? (
           tabs.map((tab) => (
             <button
@@ -37,18 +40,28 @@ function SectionHeader({ title, tabs, activeTab, onTab, actionLabel, onAction })
         )}
       </div>
       {actionLabel && (
-        <button type="button" onClick={onAction} className="shrink-0 text-sm font-medium underline-offset-4 hover:underline">
+        <button
+          type="button"
+          onClick={onAction}
+          className={`shrink-0 text-sm font-medium underline-offset-4 hover:underline ${homeTabRowActionClass(align)}`}
+        >
           {actionLabel}
         </button>
       )}
     </div>
+  );
+
+  return (
+    <EditHotspot enabled={editable} onEdit={onEdit} label="Editar listado">
+      {body}
+    </EditHotspot>
   );
 }
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const { canEditCatalog } = useVisualEdit();
-  const { openBanner, openProduct, openServicio, openBlog, openCategoryCircles, bannerOpen } = useCmsEdit();
+  const { openBanner, openProduct, openServicio, openBlog, openCategoryCircles, openRewards, openHomeTabs, bannerOpen } = useCmsEdit();
   const go = (to) => navigate(canEditCatalog ? withEditParam(to) : to);
   const [banners, setBanners] = useState([]);
   const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
@@ -62,6 +75,8 @@ export default function LandingPage() {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterDone, setNewsletterDone] = useState(false);
   const [categoryCircles, setCategoryCircles] = useState(() => withCategoryCircles(MiloStore.getAjustes()));
+  const [rewardsStrip, setRewardsStrip] = useState(() => normalizeRewardsStrip(MiloStore.getAjustes().rewardsStrip));
+  const [homeTabRows, setHomeTabRows] = useState(() => withHomeTabRows(MiloStore.getAjustes()));
 
   const loadData = () => {
     setBanners(MiloStore.getBanners().filter((banner) => banner.activo));
@@ -82,7 +97,10 @@ export default function LandingPage() {
       .map((id) => posts.find((post) => post.id === id))
       .filter(Boolean);
     setBlogPosts((featuredPosts.length ? featuredPosts : posts).slice(0, 3));
-    setCategoryCircles(withCategoryCircles(MiloStore.getAjustes()));
+    const ajustes = MiloStore.getAjustes();
+    setCategoryCircles(withCategoryCircles(ajustes));
+    setRewardsStrip(normalizeRewardsStrip(ajustes.rewardsStrip));
+    setHomeTabRows(withHomeTabRows(ajustes));
   };
 
   useEffect(() => {
@@ -281,25 +299,23 @@ export default function LandingPage() {
         </EditHotspot>
       </section>
 
-      <section className="border-b border-neutral-200 bg-neutral-950 px-5 py-8 text-white lg:px-16">
-        <div className="mx-auto flex max-w-[1440px] flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <p className="text-lg font-medium">Únete a Milo Rewards</p>
-            <p className="mt-1 text-sm text-white/70">Acceso a preventas y 5% de retorno en cada compra.</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate('/login')}
-            className="border border-white px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.18em]"
-          >
-            Join now
-          </button>
-        </div>
-      </section>
+      <RewardsStrip
+        strip={rewardsStrip}
+        editable={canEditCatalog}
+        onEdit={openRewards}
+        onAction={() => {
+          const href = rewardsStrip.buttonHref || '/login';
+          if (/^https?:/i.test(href)) {
+            window.location.assign(href);
+            return;
+          }
+          go(href);
+        }}
+      />
 
       <section className="mx-auto max-w-[1440px] px-5 py-12 lg:px-16">
         <EditHotspot enabled={canEditCatalog} onEdit={openCategoryCircles} label="Editar círculos" className="block">
-          <div className="overflow-x-auto pb-2">
+          <div className="hide-scrollbar overflow-x-auto">
             <div className={`flex min-w-full w-max gap-2.5 sm:gap-6 ${categoryRowClass(categoryCircles.align)}`}>
               {categoryCircles.circles.map((category) => (
                 <button
@@ -332,15 +348,14 @@ export default function LandingPage() {
 
       <section className="mx-auto max-w-[1440px] px-5 py-6 lg:px-16">
         <SectionHeader
-          tabs={[
-            { id: 'bestsellers', label: 'Bestsellers' },
-            { id: 'nuevos', label: 'New arrivals' },
-            { id: 'camino', label: 'En camino' },
-          ]}
+          tabs={homeTabRows.products.tabs}
+          align={homeTabRows.products.align}
           activeTab={productTab}
           onTab={setProductTab}
           actionLabel="Shop all"
           onAction={() => go(productTab === 'camino' ? '/tienda?filtro=en-camino' : '/tienda')}
+          editable={canEditCatalog}
+          onEdit={openHomeTabs}
         />
         <div className="grid grid-cols-2 items-stretch gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {shownProducts.map((product) => (
@@ -356,14 +371,14 @@ export default function LandingPage() {
 
       <section className="mx-auto max-w-[1440px] px-5 py-16 lg:px-16">
         <SectionHeader
-          tabs={[
-            { id: 'cabina', label: 'Featured top picks' },
-            { id: 'valor', label: 'Value items' },
-          ]}
+          tabs={homeTabRows.picks.tabs}
+          align={homeTabRows.picks.align}
           activeTab={picksTab}
           onTab={setPicksTab}
           actionLabel="Ver agenda"
           onAction={() => go('/citas')}
+          editable={canEditCatalog}
+          onEdit={openHomeTabs}
         />
         {picksTab === 'cabina' ? (
           <div className="grid auto-rows-fr grid-cols-1 items-stretch gap-6 sm:grid-cols-2 xl:grid-cols-4">

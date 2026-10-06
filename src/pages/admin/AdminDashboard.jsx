@@ -48,7 +48,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, loading } = useAuth();
-  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles, openLogo } = useCmsEdit();
+  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles, openLogo, openRewards, openHomeTabs } = useCmsEdit();
   const gerente = isGerente(profile?.rol);
   const requestedTab = searchParams.get('tab') || 'resumen';
   const activeTab = ADMIN_TABS.includes(requestedTab) ? requestedTab : 'resumen';
@@ -400,6 +400,26 @@ export default function AdminDashboard() {
                 Editar logo
               </button>
             </div>
+          </div>
+
+          <div className={`${panel} space-y-4 p-6`}>
+            <div>
+              <h3 className="text-lg font-medium">Franja Rewards</h3>
+              <p className="text-sm text-neutral-500">Texto, negrita, cursiva, tamaño y espacio de la franja negra bajo el banner.</p>
+            </div>
+            <button type="button" onClick={openRewards} className={primaryBtn}>
+              Editar franja
+            </button>
+          </div>
+
+          <div className={`${panel} space-y-4 p-6`}>
+            <div>
+              <h3 className="text-lg font-medium">Listados de Inicio</h3>
+              <p className="text-sm text-neutral-500">Bestsellers, New arrivals, Featured top picks: nombres y centrado.</p>
+            </div>
+            <button type="button" onClick={openHomeTabs} className={primaryBtn}>
+              Editar listados
+            </button>
           </div>
 
           <div className={`${panel} space-y-3 p-6`}>

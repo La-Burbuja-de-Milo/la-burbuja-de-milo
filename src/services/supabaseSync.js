@@ -2,6 +2,8 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { withProductPasillos, productPasillos } from '../lib/pasillos';
 import { bannerFotoSrc, cloneBanner, normalizeBannerFoto } from '../lib/bannerFrames';
 import { normalizeSiteLogo } from '../lib/categoryCircles';
+import { normalizeRewardsStrip } from '../lib/rewardsStrip';
+import { withHomeTabRows } from '../lib/homeTabRows';
 
 const KEYS = {
   BANNERS: 'milo_banners',
@@ -320,6 +322,8 @@ export function mapAjustesFromDb(row) {
     categoryCirclesAlign: row.category_circles_align || 'start',
     newsletterEmails: Array.isArray(row.newsletter_emails) ? row.newsletter_emails : [],
     logo: normalizeSiteLogo(row.logo),
+    rewardsStrip: normalizeRewardsStrip(row.rewards_strip),
+    homeTabRows: withHomeTabRows(row.home_tab_rows || {}),
     updatedAt: row.updated_at || null
   };
 }
@@ -332,7 +336,9 @@ function mapAjustesToDb(ajustes) {
     category_circles: Array.isArray(ajustes?.categoryCircles) ? ajustes.categoryCircles : [],
     category_circles_align: ajustes?.categoryCirclesAlign || 'start',
     newsletter_emails: Array.isArray(ajustes?.newsletterEmails) ? ajustes.newsletterEmails : [],
-    logo: normalizeSiteLogo(ajustes?.logo)
+    logo: normalizeSiteLogo(ajustes?.logo),
+    rewards_strip: normalizeRewardsStrip(ajustes?.rewardsStrip),
+    home_tab_rows: withHomeTabRows(ajustes)
   };
 }
 
@@ -423,7 +429,7 @@ function friendlySyncError(label, error) {
     return `Supabase rechazó ${label}: inicia sesión como gerente o aplica la migración de vitrina (rol gerente).`;
   }
   if (/schema cache|does not exist|Could not find the table/i.test(msg)) {
-    return `Falta ${label} en Supabase. Ejecuta supabase/migrations/20261006090000_vitrina_publicar.sql en el SQL Editor.`;
+    return `Falta ${label} en Supabase. Ejecuta las migraciones de vitrina (círculos, logo y franja Rewards) en el SQL Editor.`;
   }
   return `No se pudo guardar ${label}: ${msg}`;
 }
@@ -433,13 +439,23 @@ async function upsertAjustes(ajustes) {
   const payload = mapAjustesToDb(ajustes);
   const { error } = await supabase.from('ajustes').upsert(payload);
   if (!error) return;
-  if (/logo/i.test(error.message || '')) {
-    const { logo: _logo, ...rest } = payload;
-    const { error: retry } = await supabase.from('ajustes').upsert(rest);
-    if (retry) throw retry;
-    return;
+  const msg = error.message || '';
+  let next = { ...payload };
+  if (/logo/i.test(msg)) {
+    const { logo: _logo, ...rest } = next;
+    next = rest;
   }
-  throw error;
+  if (/rewards_strip/i.test(msg)) {
+    const { rewards_strip: _rewards, ...rest } = next;
+    next = rest;
+  }
+  if (/home_tab_rows/i.test(msg)) {
+    const { home_tab_rows: _tabs, ...rest } = next;
+    next = rest;
+  }
+  if (next === payload || Object.keys(next).length === Object.keys(payload).length) throw error;
+  const { error: retry } = await supabase.from('ajustes').upsert(next);
+  if (retry) throw retry;
 }
 
 function mapMovimientoToDb(movimiento) {

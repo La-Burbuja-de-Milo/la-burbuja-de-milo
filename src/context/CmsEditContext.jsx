@@ -12,6 +12,10 @@ import { productPasillos, withProductPasillos } from '../lib/pasillos';
 import BannerPhotosFields from '../components/admin/BannerPhotosFields';
 import CategoryCirclesFields from '../components/admin/CategoryCirclesFields';
 import { withCategoryCircles, normalizeSiteLogo } from '../lib/categoryCircles';
+import { normalizeRewardsStrip } from '../lib/rewardsStrip';
+import RewardsStripFields from '../components/admin/RewardsStripFields';
+import { withHomeTabRows } from '../lib/homeTabRows';
+import HomeTabRowsFields from '../components/admin/HomeTabRowsFields';
 
 const CmsEditContext = createContext(null);
 
@@ -259,6 +263,10 @@ export function CmsEditProvider({ children }) {
   const [circlesForm, setCirclesForm] = useState(() => withCategoryCircles(MiloStore.getAjustes()));
   const [logoOpen, setLogoOpen] = useState(false);
   const [logoForm, setLogoForm] = useState(() => normalizeSiteLogo());
+  const [rewardsOpen, setRewardsOpen] = useState(false);
+  const [rewardsForm, setRewardsForm] = useState(() => normalizeRewardsStrip());
+  const [homeTabsOpen, setHomeTabsOpen] = useState(false);
+  const [homeTabsForm, setHomeTabsForm] = useState(() => withHomeTabRows());
 
   const openProduct = (item = null) => {
     setProduct(item);
@@ -329,6 +337,16 @@ export function CmsEditProvider({ children }) {
     setLogoOpen(true);
   };
 
+  const openRewards = () => {
+    setRewardsForm(normalizeRewardsStrip(MiloStore.getAjustes().rewardsStrip));
+    setRewardsOpen(true);
+  };
+
+  const openHomeTabs = () => {
+    setHomeTabsForm(withHomeTabRows(MiloStore.getAjustes()));
+    setHomeTabsOpen(true);
+  };
+
   useEffect(() => {
     const refreshCatalog = () => {
       setPasillos(MiloStore.getPasillos());
@@ -340,7 +358,7 @@ export function CmsEditProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, openLogo, bannerOpen }),
+    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, openLogo, openRewards, openHomeTabs, bannerOpen }),
     [bannerOpen]
   );
 
@@ -779,6 +797,52 @@ export function CmsEditProvider({ children }) {
             />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setLogoOpen(false)} className={ghostBtn}>Cancelar</button>
+              <button type="submit" className={primaryBtn}>Publicar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {rewardsOpen && (
+        <Modal title="Franja Rewards" onClose={() => setRewardsOpen(false)}>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const current = MiloStore.getAjustes();
+              MiloStore.saveAjustes({ ...current, rewardsStrip: normalizeRewardsStrip(rewardsForm) });
+              setRewardsOpen(false);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-neutral-500">
+              Elige el texto, qué va en negrita o cursiva, el tamaño y el espacio de la franja negra bajo el banner.
+            </p>
+            <RewardsStripFields form={rewardsForm} onChange={setRewardsForm} />
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setRewardsOpen(false)} className={ghostBtn}>Cancelar</button>
+              <button type="submit" className={primaryBtn}>Publicar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {homeTabsOpen && (
+        <Modal title="Listados de Inicio" onClose={() => setHomeTabsOpen(false)}>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const current = MiloStore.getAjustes();
+              MiloStore.saveAjustes({ ...current, homeTabRows: withHomeTabRows(homeTabsForm) });
+              setHomeTabsOpen(false);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-neutral-500">
+              Cambia los nombres y cómo se alinean en móvil y escritorio: izquierda, centro, derecha o distribuidos.
+            </p>
+            <HomeTabRowsFields form={homeTabsForm} onChange={setHomeTabsForm} />
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setHomeTabsOpen(false)} className={ghostBtn}>Cancelar</button>
               <button type="submit" className={primaryBtn}>Publicar</button>
             </div>
           </form>

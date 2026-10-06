@@ -148,6 +148,40 @@
   will-change: transform;
 }
 
+.milo-rewards-strip {
+  padding-block: var(--rewards-pad, 10px);
+}
+
+.milo-rewards-copy {
+  font-size: var(--rewards-size, 11px);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.milo-rewards-copy strong,
+.milo-rewards-copy b {
+  font-weight: 600;
+}
+
+.milo-rewards-copy em,
+.milo-rewards-copy i {
+  font-style: italic;
+}
+
+.milo-rewards-copy u {
+  text-underline-offset: 2px;
+}
+
+@media (min-width: 1024px) {
+  .milo-rewards-strip {
+    padding-block: var(--rewards-pad-lg, 32px);
+  }
+
+  .milo-rewards-copy {
+    font-size: var(--rewards-size-lg, 16px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   [class*="banner-motion-"] {
     animation: none !important;

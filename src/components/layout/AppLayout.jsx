@@ -15,6 +15,7 @@ import {
   MessageCircle,
   LogOut,
   Shield,
+  ChevronDown,
 } from 'lucide-react';
 import { MiloStore } from '../../services/miloStore';
 import CartDrawer from '../cart/CartDrawer';
@@ -43,6 +44,45 @@ const BENEFITS = [
   { icon: Gift, label: '15% en tu primera orden' },
   { icon: Sparkles, label: 'Facial, corporal y bienestar' },
   { icon: MessageCircle, label: 'Concierge Milo' },
+];
+
+const FOOTER_SECTIONS = [
+  {
+    id: 'atencion',
+    title: 'Atención',
+    links: [
+      { to: '/citas', label: 'Agendar valoración' },
+      { to: '/tienda', label: 'Seguimiento de pedidos' },
+      { to: '/blog', label: 'Guías de cuidado' }
+    ]
+  },
+  {
+    id: 'cuenta',
+    title: 'Mi cuenta',
+    links: [
+      { to: '/login', label: 'Iniciar sesión' },
+      { to: '/mi-burbuja', label: 'Mi Burbuja' },
+      { to: '/tienda?filtro=en-camino', label: 'Reservas en camino' }
+    ]
+  },
+  {
+    id: 'marca',
+    title: 'La marca',
+    links: [
+      { to: '/citas', label: 'Valoración integral' },
+      { to: '/blog', label: 'Facial, corporal y bienestar' },
+      { to: '/tienda?pasillo=bienestar', label: 'Marcas fuXion y Riman' }
+    ]
+  },
+  {
+    id: 'legal',
+    title: 'Legal',
+    links: [
+      { label: 'Privacidad' },
+      { label: 'Términos' },
+      { label: 'Accesibilidad' }
+    ]
+  }
 ];
 
 function linkActive(pathname, search, to, end) {
@@ -100,6 +140,66 @@ function SiteLogo({ logo, href, editable, onEdit }) {
     <NavLink to={href} aria-label="Inicio" className="shrink-0">
       {mark}
     </NavLink>
+  );
+}
+
+function FooterLinkList({ links, hrefFor }) {
+  return (
+    <ul className="space-y-2">
+      {links.map((link) => (
+        <li key={link.label}>
+          {link.to ? (
+            <NavLink to={hrefFor(link.to)} className="hover:text-neutral-900 dark:hover:text-white">
+              {link.label}
+            </NavLink>
+          ) : (
+            link.label
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FooterNav({ hrefFor }) {
+  const [openId, setOpenId] = useState(null);
+
+  return (
+    <>
+      <div className="divide-y divide-neutral-200 dark:divide-neutral-800 lg:hidden">
+        {FOOTER_SECTIONS.map((section) => {
+          const expanded = openId === section.id;
+          return (
+            <div key={section.id}>
+              <button
+                type="button"
+                aria-expanded={expanded}
+                onClick={() => setOpenId(expanded ? null : section.id)}
+                className="flex w-full items-center justify-between py-3 text-left text-xs font-semibold uppercase tracking-[0.16em] text-neutral-900 dark:text-white"
+              >
+                {section.title}
+                <ChevronDown className={`h-4 w-4 shrink-0 text-neutral-400 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+              </button>
+              {expanded ? (
+                <div className="pb-3">
+                  <FooterLinkList links={section.links} hrefFor={hrefFor} />
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      <div className="hidden lg:grid lg:grid-cols-4 lg:gap-10">
+        {FOOTER_SECTIONS.map((section) => (
+          <div key={section.id}>
+            <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-900 dark:text-white">
+              {section.title}
+            </h2>
+            <FooterLinkList links={section.links} hrefFor={hrefFor} />
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -392,7 +492,7 @@ function AppChrome() {
                 <li key={link.to}>
                   <Link
                     to={hrefFor(link.to)}
-                    className="block py-1 text-sm font-semibold uppercase tracking-[0.14em] text-white"
+                    className="block py-1 text-sm font-medium text-white"
                   >
                     {link.label}
                   </Link>
@@ -400,22 +500,22 @@ function AppChrome() {
               ))}
               {!session && (
                 <li>
-                  <NavLink to="/login" className="block py-1 text-sm uppercase tracking-[0.14em] text-white/80">
+                  <NavLink to="/login" className="block py-1 text-sm font-medium text-white/80">
                     Iniciar sesión
                   </NavLink>
                 </li>
               )}
               {session && (
                 <li>
-                  <button type="button" onClick={() => signOut()} className="py-1 text-sm uppercase tracking-[0.14em] text-white/80">
+                  <button type="button" onClick={() => signOut()} className="py-1 text-sm font-medium text-white/80">
                     Cerrar sesión
                   </button>
                 </li>
               )}
               {canOpenCrm && (
                 <li>
-                  <NavLink to="/admin" className="block py-1 text-sm uppercase tracking-[0.14em] text-white/80">
-                    {isGerente(profile?.rol) ? 'Panel Gerente' : 'Panel Asesor'}
+                  <NavLink to="/admin" className="block py-1 text-sm font-medium text-white/80">
+                    {isGerente(profile?.rol) ? 'Panel gerente' : 'Panel asesor'}
                   </NavLink>
                 </li>
               )}
@@ -423,7 +523,7 @@ function AppChrome() {
                 <button
                   type="button"
                   onClick={() => setIsDarkMode((value) => !value)}
-                  className="flex items-center gap-2 py-1 text-sm uppercase tracking-[0.14em] text-white/80"
+                  className="flex items-center gap-2 py-1 text-sm font-medium text-white/80"
                 >
                   {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                   {isDarkMode ? 'Modo claro' : 'Modo oscuro'}
@@ -454,42 +554,11 @@ function AppChrome() {
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
 
-      <footer className="mt-auto border-t border-neutral-200 bg-white px-4 py-12 text-sm text-neutral-600 lg:px-8 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
-        <div className="mx-auto grid max-w-[1440px] gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-900 dark:text-white">Atención</h2>
-            <ul className="space-y-2">
-              <li><NavLink to="/citas" className="hover:text-neutral-900 dark:hover:text-white">Agendar valoración</NavLink></li>
-              <li><NavLink to="/tienda" className="hover:text-neutral-900 dark:hover:text-white">Seguimiento de pedidos</NavLink></li>
-              <li><NavLink to="/blog" className="hover:text-neutral-900 dark:hover:text-white">Guías de cuidado</NavLink></li>
-            </ul>
-          </div>
-          <div>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-900 dark:text-white">Mi cuenta</h2>
-            <ul className="space-y-2">
-              <li><NavLink to="/login" className="hover:text-neutral-900 dark:hover:text-white">Iniciar sesión</NavLink></li>
-              <li><NavLink to="/mi-burbuja" className="hover:text-neutral-900 dark:hover:text-white">Mi Burbuja</NavLink></li>
-              <li><NavLink to="/tienda?filtro=en-camino" className="hover:text-neutral-900 dark:hover:text-white">Reservas en camino</NavLink></li>
-            </ul>
-          </div>
-          <div>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-900 dark:text-white">La marca</h2>
-            <ul className="space-y-2">
-              <li><NavLink to="/citas" className="hover:text-neutral-900 dark:hover:text-white">Valoración integral</NavLink></li>
-              <li><NavLink to="/blog" className="hover:text-neutral-900 dark:hover:text-white">Facial, corporal y bienestar</NavLink></li>
-              <li><NavLink to="/tienda?pasillo=bienestar" className="hover:text-neutral-900 dark:hover:text-white">Marcas fuXion y Riman</NavLink></li>
-            </ul>
-          </div>
-          <div>
-            <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-900 dark:text-white">Legal</h2>
-            <ul className="space-y-2">
-              <li>Privacidad</li>
-              <li>Términos</li>
-              <li>Accesibilidad</li>
-            </ul>
-          </div>
+      <footer className="mt-auto border-t border-neutral-200 bg-white px-4 py-8 text-sm text-neutral-600 lg:px-8 lg:py-12 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-400">
+        <div className="mx-auto max-w-[1440px]">
+          <FooterNav hrefFor={hrefFor} />
         </div>
-        <p className="mx-auto mt-10 max-w-[1440px] text-xs text-neutral-500">
+        <p className="mx-auto mt-6 max-w-[1440px] text-xs text-neutral-500 lg:mt-10">
           © 2026 La Burbuja de Milo. Centro de estética facial, corporal, bienestar y tienda.
         </p>
       </footer>

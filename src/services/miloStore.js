@@ -7,6 +7,8 @@ import { COP_CODE, toCopAmount } from '../lib/money';
 import { esStockGenerico, findVariante, hasNamedVariantes, stockEstado, withVariantes } from '../lib/variantes';
 import { cloneBanner, withBannerFrames } from '../lib/bannerFrames';
 import { withCategoryCircles, normalizeSiteLogo } from '../lib/categoryCircles';
+import { normalizeRewardsStrip } from '../lib/rewardsStrip';
+import { withHomeTabRows } from '../lib/homeTabRows';
 import { productPasillos, withProductPasillos } from '../lib/pasillos';
 
 export { esStockGenerico, findVariante, hasNamedVariantes, stockEstado };
@@ -694,7 +696,9 @@ const SEED_AJUSTES = {
   newsletterEmails: [],
   categoryCircles: [],
   categoryCirclesAlign: 'start',
-  logo: normalizeSiteLogo()
+  logo: normalizeSiteLogo(),
+  rewardsStrip: normalizeRewardsStrip(),
+  homeTabRows: withHomeTabRows()
 };
 
 const LEGACY_PROMO = 'Bienvenida a La Burbuja de Milo | 15% en tu primera compra con código MILO15';
@@ -881,12 +885,20 @@ function mergeAjustesPreferLocal(local, remote) {
   const keepLocalLogo = logoHasInlinePhoto(localLogo)
     || (logoHasPhoto(localLogo) && !logoHasPhoto(remoteLogo))
     || (logoHasPhoto(localLogo) && logoHasPhoto(remoteLogo) && localIsNewer);
+  const localRewards = local.rewardsStrip && typeof local.rewardsStrip === 'object';
+  const remoteRewards = remote.rewardsStrip && typeof remote.rewardsStrip === 'object';
+  const keepLocalRewardsStrip = (localRewards && !remoteRewards) || (localRewards && remoteRewards && localIsNewer);
+  const localTabs = local.homeTabRows && typeof local.homeTabRows === 'object';
+  const remoteTabs = remote.homeTabRows && typeof remote.homeTabRows === 'object';
+  const keepLocalHomeTabs = (localTabs && !remoteTabs) || (localTabs && remoteTabs && localIsNewer);
   return {
     ...remote,
     ...local,
     promoActivo: keepLocalPromo ? local.promoActivo : remote.promoActivo,
     promoTexto: keepLocalPromo ? (local.promoTexto || remote.promoTexto) : (remote.promoTexto || local.promoTexto),
     logo: keepLocalLogo ? localLogo : remoteLogo,
+    rewardsStrip: normalizeRewardsStrip(keepLocalRewardsStrip ? local.rewardsStrip : remote.rewardsStrip),
+    homeTabRows: withHomeTabRows(keepLocalHomeTabs ? local : remote),
     categoryCircles: keepLocalCircles ? localCircles : remoteCircles,
     categoryCirclesAlign: keepLocalCircles
       ? (local.categoryCirclesAlign || remote.categoryCirclesAlign)
@@ -1553,7 +1565,7 @@ export const MiloStore = {
   getAjustes: () => {
     const saved = loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES) || SEED_AJUSTES;
     const { circles, align } = withCategoryCircles(saved);
-    return { ...SEED_AJUSTES, ...saved, categoryCircles: circles, categoryCirclesAlign: align, logo: normalizeSiteLogo(saved.logo) };
+    return { ...SEED_AJUSTES, ...saved, categoryCircles: circles, categoryCirclesAlign: align, logo: normalizeSiteLogo(saved.logo), rewardsStrip: normalizeRewardsStrip(saved.rewardsStrip), homeTabRows: withHomeTabRows(saved) };
   },
   saveAjustes: (ajustes) => {
     const current = loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES) || SEED_AJUSTES;
@@ -1563,7 +1575,9 @@ export const MiloStore = {
       ...ajustes,
       categoryCircles: ajustes.categoryCircles ?? current.categoryCircles,
       categoryCirclesAlign: ajustes.categoryCirclesAlign ?? current.categoryCirclesAlign,
-      logo: normalizeSiteLogo(ajustes.logo !== undefined ? ajustes.logo : current.logo)
+      logo: normalizeSiteLogo(ajustes.logo !== undefined ? ajustes.logo : current.logo),
+      rewardsStrip: normalizeRewardsStrip(ajustes.rewardsStrip !== undefined ? ajustes.rewardsStrip : current.rewardsStrip),
+      homeTabRows: withHomeTabRows(ajustes.homeTabRows !== undefined ? ajustes : current)
     };
     const { circles, align } = withCategoryCircles(merged);
     saveData(STORAGE_KEYS.AJUSTES, {
