@@ -117,7 +117,9 @@ export function normalizeCategoryCircle(item, fallback) {
 }
 
 export function withCategoryCircles(ajustes = {}) {
-  const saved = Array.isArray(ajustes.categoryCircles) ? ajustes.categoryCircles : [];
+  const saved = Array.isArray(ajustes.categoryCircles)
+    ? ajustes.categoryCircles
+    : (Array.isArray(ajustes.categoryCircles?.circles) ? ajustes.categoryCircles.circles : []);
   const byId = new Map(DEFAULT_CATEGORY_CIRCLES.map((item) => [item.id, item]));
   const used = new Set();
   const circles = [];

@@ -16,6 +16,8 @@ import { normalizeRewardsStrip } from '../lib/rewardsStrip';
 import RewardsStripFields from '../components/admin/RewardsStripFields';
 import { withHomeTabRows } from '../lib/homeTabRows';
 import HomeTabRowsFields from '../components/admin/HomeTabRowsFields';
+import { withHomeStory } from '../lib/homeStory';
+import HomeStoryFields from '../components/admin/HomeStoryFields';
 
 const CmsEditContext = createContext(null);
 
@@ -267,6 +269,9 @@ export function CmsEditProvider({ children }) {
   const [rewardsForm, setRewardsForm] = useState(() => normalizeRewardsStrip());
   const [homeTabsOpen, setHomeTabsOpen] = useState(false);
   const [homeTabsForm, setHomeTabsForm] = useState(() => withHomeTabRows());
+  const [homeStoryOpen, setHomeStoryOpen] = useState(false);
+  const [homeStorySection, setHomeStorySection] = useState('pasillos');
+  const [homeStoryForm, setHomeStoryForm] = useState(() => withHomeStory());
 
   const openProduct = (item = null) => {
     setProduct(item);
@@ -347,6 +352,15 @@ export function CmsEditProvider({ children }) {
     setHomeTabsOpen(true);
   };
 
+  const openHomeStory = (section = 'pasillos') => {
+    setHomeStoryForm(withHomeStory(MiloStore.getAjustes()));
+    setHomeStorySection(section);
+    setHomeStoryOpen(true);
+  };
+  const openHomePasillos = () => openHomeStory('pasillos');
+  const openHomeMarcas = () => openHomeStory('marcas');
+  const openHomeEstetica = () => openHomeStory('estetica');
+
   useEffect(() => {
     const refreshCatalog = () => {
       setPasillos(MiloStore.getPasillos());
@@ -358,7 +372,7 @@ export function CmsEditProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, openLogo, openRewards, openHomeTabs, bannerOpen }),
+    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, bannerOpen }),
     [bannerOpen]
   );
 
@@ -843,6 +857,35 @@ export function CmsEditProvider({ children }) {
             <HomeTabRowsFields form={homeTabsForm} onChange={setHomeTabsForm} />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setHomeTabsOpen(false)} className={ghostBtn}>Cancelar</button>
+              <button type="submit" className={primaryBtn}>Publicar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {homeStoryOpen && (
+        <Modal
+          title={homeStorySection === 'marcas' ? 'Marcas en vitrina' : homeStorySection === 'estetica' ? 'Estética y bienestar' : 'Pasillos de la casa'}
+          onClose={() => setHomeStoryOpen(false)}
+          className={homeStorySection === 'estetica' ? 'max-w-xl' : 'max-w-5xl'}
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const current = MiloStore.getAjustes();
+              MiloStore.saveAjustes({ ...current, homeStory: withHomeStory(homeStoryForm) });
+              setHomeStoryOpen(false);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-neutral-500">
+              {homeStorySection === 'estetica'
+                ? 'Edita el recuadro negro de Inicio. Las notas del blog se editan cada una desde su tarjeta.'
+                : 'Sube foto, recorta, cambia títulos, textos y enlaces. Lo que quede en el recuadro es lo que se publica.'}
+            </p>
+            <HomeStoryFields form={homeStoryForm} onChange={setHomeStoryForm} section={homeStorySection} />
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setHomeStoryOpen(false)} className={ghostBtn}>Cancelar</button>
               <button type="submit" className={primaryBtn}>Publicar</button>
             </div>
           </form>

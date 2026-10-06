@@ -4,6 +4,8 @@ import { bannerFotoSrc, cloneBanner, normalizeBannerFoto } from '../lib/bannerFr
 import { normalizeSiteLogo } from '../lib/categoryCircles';
 import { normalizeRewardsStrip } from '../lib/rewardsStrip';
 import { withHomeTabRows } from '../lib/homeTabRows';
+import { withHomeStory } from '../lib/homeStory';
+import { logoWithCms, pickCmsValue, siteCmsFromAjustes, siteCmsFromLogo } from '../lib/siteCms';
 
 const KEYS = {
   BANNERS: 'milo_banners',
@@ -315,20 +317,26 @@ function mapMovimientoFromDb(row) {
 
 export function mapAjustesFromDb(row) {
   if (!row) return null;
+  const cms = siteCmsFromLogo(row.logo);
+  const circles = Array.isArray(row.category_circles)
+    ? row.category_circles
+    : (Array.isArray(row.category_circles?.circles) ? row.category_circles.circles : []);
   return {
     promoActivo: row.promo_activo !== false,
     promoTexto: row.promo_texto || '',
-    categoryCircles: Array.isArray(row.category_circles) ? row.category_circles : [],
-    categoryCirclesAlign: row.category_circles_align || 'start',
+    categoryCircles: circles,
+    categoryCirclesAlign: row.category_circles_align || row.category_circles?.align || 'start',
     newsletterEmails: Array.isArray(row.newsletter_emails) ? row.newsletter_emails : [],
     logo: normalizeSiteLogo(row.logo),
-    rewardsStrip: normalizeRewardsStrip(row.rewards_strip),
-    homeTabRows: withHomeTabRows(row.home_tab_rows || {}),
+    rewardsStrip: normalizeRewardsStrip(pickCmsValue(row.rewards_strip, cms.rewardsStrip)),
+    homeTabRows: withHomeTabRows(pickCmsValue(row.home_tab_rows, cms.homeTabRows)),
+    homeStory: withHomeStory(pickCmsValue(row.home_story, cms.homeStory)),
     updatedAt: row.updated_at || null
   };
 }
 
 function mapAjustesToDb(ajustes) {
+  const cms = siteCmsFromAjustes(ajustes);
   return {
     id: 'site',
     promo_activo: ajustes?.promoActivo !== false,
@@ -336,9 +344,10 @@ function mapAjustesToDb(ajustes) {
     category_circles: Array.isArray(ajustes?.categoryCircles) ? ajustes.categoryCircles : [],
     category_circles_align: ajustes?.categoryCirclesAlign || 'start',
     newsletter_emails: Array.isArray(ajustes?.newsletterEmails) ? ajustes.newsletterEmails : [],
-    logo: normalizeSiteLogo(ajustes?.logo),
-    rewards_strip: normalizeRewardsStrip(ajustes?.rewardsStrip),
-    home_tab_rows: withHomeTabRows(ajustes)
+    logo: logoWithCms(ajustes?.logo, cms),
+    rewards_strip: cms.rewardsStrip,
+    home_tab_rows: cms.homeTabRows,
+    home_story: cms.homeStory
   };
 }
 
@@ -408,7 +417,9 @@ async function persistBannerImages(banners) {
 }
 
 async function persistAjustesImages(ajustes) {
-  const circles = Array.isArray(ajustes?.categoryCircles) ? ajustes.categoryCircles : [];
+  const circles = Array.isArray(ajustes?.categoryCircles)
+    ? ajustes.categoryCircles
+    : (Array.isArray(ajustes?.categoryCircles?.circles) ? ajustes.categoryCircles.circles : []);
   const categoryCircles = [];
   for (const circle of circles) {
     const imagen = circle?.imagen
@@ -420,7 +431,27 @@ async function persistAjustesImages(ajustes) {
   const logoImagen = logo.imagen
     ? await uploadVitrinaAsset('brand/logo', logo.imagen)
     : logo.imagen;
-  return { ...ajustes, categoryCircles, logo: { ...logo, imagen: logoImagen } };
+  const story = withHomeStory(ajustes);
+  const persistCards = async (items, folder) => {
+    const next = [];
+    for (const item of items || []) {
+      const imagen = item?.imagen
+        ? await uploadVitrinaAsset(`${folder}/${item.id || 'item'}`, item.imagen)
+        : item?.imagen;
+      next.push({ ...item, imagen });
+    }
+    return next;
+  };
+  return {
+    ...ajustes,
+    categoryCircles,
+    logo: { ...logo, imagen: logoImagen },
+    homeStory: {
+      ...story,
+      pasillos: { ...story.pasillos, items: await persistCards(story.pasillos.items, 'story/pasillos') },
+      marcas: { ...story.marcas, items: await persistCards(story.marcas.items, 'story/marcas') }
+    }
+  };
 }
 
 function friendlySyncError(label, error) {
@@ -429,33 +460,29 @@ function friendlySyncError(label, error) {
     return `Supabase rechazó ${label}: inicia sesión como gerente o aplica la migración de vitrina (rol gerente).`;
   }
   if (/schema cache|does not exist|Could not find the table/i.test(msg)) {
-    return `Falta ${label} en Supabase. Ejecuta las migraciones de vitrina (círculos, logo y franja Rewards) en el SQL Editor.`;
+    return `Falta ${label} en Supabase. Ejecuta las migraciones de vitrina (círculos y logo) en el SQL Editor.`;
   }
   return `No se pudo guardar ${label}: ${msg}`;
 }
 
 async function upsertAjustes(ajustes) {
   if (!supabase || !ajustes) return;
-  const payload = mapAjustesToDb(ajustes);
-  const { error } = await supabase.from('ajustes').upsert(payload);
-  if (!error) return;
-  const msg = error.message || '';
-  let next = { ...payload };
-  if (/logo/i.test(msg)) {
-    const { logo: _logo, ...rest } = next;
-    next = rest;
+  let payload = mapAjustesToDb(ajustes);
+  let lastError = null;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const { error } = await supabase.from('ajustes').upsert(payload);
+    if (!error) return;
+    lastError = error;
+    const msg = error.message || '';
+    const column = (msg.match(/could not find the '([^']+)' column/i) || msg.match(/'([a-z0-9_]+)' column of/i) || [])[1];
+    if (!column || !(column in payload) || column === 'id' || column === 'logo') {
+      throw error;
+    }
+    const next = { ...payload };
+    delete next[column];
+    payload = next;
   }
-  if (/rewards_strip/i.test(msg)) {
-    const { rewards_strip: _rewards, ...rest } = next;
-    next = rest;
-  }
-  if (/home_tab_rows/i.test(msg)) {
-    const { home_tab_rows: _tabs, ...rest } = next;
-    next = rest;
-  }
-  if (next === payload || Object.keys(next).length === Object.keys(payload).length) throw error;
-  const { error: retry } = await supabase.from('ajustes').upsert(next);
-  if (retry) throw retry;
+  throw lastError;
 }
 
 function mapMovimientoToDb(movimiento) {
@@ -622,7 +649,7 @@ export function syncStoreKey(key, data) {
         await replaceRows('inventario_movimientos', data, mapMovimientoToDb);
         break;
       case KEYS.AJUSTES:
-        await upsertAjustes(data);
+        await upsertAjustes(await persistAjustesImages(data));
         break;
       default:
         break;
@@ -665,5 +692,5 @@ export async function publishCatalogToSupabase({ banners, ajustes, persistLocal 
   if (errors.length) {
     return { ok: false, error: errors.join(' ') };
   }
-  return { ok: true, message: 'Banners, círculos y barra promocional ya están en el sitio.' };
+  return { ok: true, message: 'Publicado en el sitio: vitrina, pasillos, marcas, estética y franja.' };
 }

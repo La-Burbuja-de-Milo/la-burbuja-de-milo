@@ -11,6 +11,7 @@ import { categoryRowClass, withCategoryCircles } from '../../lib/categoryCircles
 import { productInPasillo } from '../../lib/pasillos';
 import { normalizeRewardsStrip } from '../../lib/rewardsStrip';
 import { homeTabRowActionClass, tabRowClass, withHomeTabRows } from '../../lib/homeTabRows';
+import { storyCardVisualProps, withHomeStory } from '../../lib/homeStory';
 import EditHotspot from '../../components/admin/EditHotspot';
 import RewardsStrip from '../../components/shop/RewardsStrip';
 import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
@@ -62,7 +63,7 @@ function SectionHeader({ title, tabs, activeTab, onTab, actionLabel, onAction, a
 export default function LandingPage() {
   const navigate = useNavigate();
   const { canEditCatalog } = useVisualEdit();
-  const { openBanner, openProduct, openServicio, openBlog, openCategoryCircles, openRewards, openHomeTabs, bannerOpen } = useCmsEdit();
+  const { openBanner, openProduct, openServicio, openBlog, openCategoryCircles, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, bannerOpen } = useCmsEdit();
   const go = (to) => navigate(canEditCatalog ? withEditParam(to) : to);
   const [banners, setBanners] = useState([]);
   const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
@@ -81,6 +82,7 @@ export default function LandingPage() {
   const [categoryCircles, setCategoryCircles] = useState(() => withCategoryCircles(MiloStore.getAjustes()));
   const [rewardsStrip, setRewardsStrip] = useState(() => normalizeRewardsStrip(MiloStore.getAjustes().rewardsStrip));
   const [homeTabRows, setHomeTabRows] = useState(() => withHomeTabRows(MiloStore.getAjustes()));
+  const [homeStory, setHomeStory] = useState(() => withHomeStory(MiloStore.getAjustes()));
 
   const loadData = () => {
     setBanners(MiloStore.getBanners().filter((banner) => banner.activo));
@@ -106,6 +108,7 @@ export default function LandingPage() {
     setCategoryCircles(withCategoryCircles(ajustes));
     setRewardsStrip(normalizeRewardsStrip(ajustes.rewardsStrip));
     setHomeTabRows(withHomeTabRows(ajustes));
+    setHomeStory(withHomeStory(ajustes));
   };
 
   useEffect(() => {
@@ -434,60 +437,65 @@ export default function LandingPage() {
 
       <section className="bg-[#f6f6f6] py-16 dark:bg-neutral-900">
         <div className="mx-auto max-w-[1440px] px-5 lg:px-16">
-          <SectionHeader title="Pasillos de la casa" actionLabel="Ver tienda" onAction={() => go('/tienda')} />
+          <SectionHeader
+            title={homeStory.pasillos.title}
+            actionLabel={homeStory.pasillos.actionLabel}
+            onAction={() => go(homeStory.pasillos.actionTo || '/tienda')}
+            editable={canEditCatalog}
+            onEdit={openHomePasillos}
+          />
           <div className="grid gap-4 md:grid-cols-3">
-            {[
-              { title: 'Estética facial', copy: 'Limpieza, sérums, K-beauty Riman y protocolos de cabina para el rostro.', to: '/tienda?pasillo=skincare', seed: 'brand-skin' },
-              { title: 'Estética corporal', copy: 'Reafirmación, drenaje, aceites de masaje y cuidado corporal Botalab.', to: '/tienda?pasillo=corporal', seed: 'brand-body' },
-              { title: 'Bienestar y nutrición', copy: 'fuXion, Lifening y nutricosméticos para sostener resultados desde adentro.', to: '/tienda?pasillo=bienestar', seed: 'brand-well' },
-            ].map((item) => (
-              <button
-                key={item.title}
-                type="button"
-                onClick={() => go(item.to)}
-                className="group overflow-hidden bg-white text-left dark:bg-neutral-950"
-              >
-                <ProductVisual seed={item.seed} variant="hero" className="h-56 w-full" />
-                <div className="p-5">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em]">{item.title}</h3>
-                  <p className="mt-2 text-sm text-neutral-500">{item.copy}</p>
-                </div>
-              </button>
+            {homeStory.pasillos.items.map((item) => (
+              <EditHotspot key={item.id} enabled={canEditCatalog} onEdit={openHomePasillos} label="Editar pasillo">
+                <button
+                  type="button"
+                  onClick={() => go(item.to)}
+                  className="group overflow-hidden bg-white text-left dark:bg-neutral-950"
+                >
+                  <ProductVisual
+                    {...storyCardVisualProps(item)}
+                    variant="hero"
+                    className="h-56 w-full"
+                  />
+                  <div className="p-5">
+                    <h3 className="text-sm font-semibold uppercase tracking-[0.16em]">{item.title}</h3>
+                    <p className="mt-2 text-sm text-neutral-500">{item.copy}</p>
+                  </div>
+                </button>
+              </EditHotspot>
             ))}
           </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-[1440px] px-5 py-16 lg:px-16">
-        <SectionHeader title="Marcas en vitrina" actionLabel="Ver tienda" onAction={() => go('/tienda')} />
+        <SectionHeader
+          title={homeStory.marcas.title}
+          actionLabel={homeStory.marcas.actionLabel}
+          onAction={() => go(homeStory.marcas.actionTo || '/tienda')}
+          editable={canEditCatalog}
+          onEdit={openHomeMarcas}
+        />
         <div className="grid gap-4 md:grid-cols-2">
-          {[
-            {
-              title: 'fuXion',
-              copy: 'Nutrición funcional para energía, tránsito y vitalidad. Cafezzino, Prunex1 y VitaXion entran al protocolo de bienestar.',
-              to: '/tienda?marca=fuxion',
-              seed: 'brand-fuxion'
-            },
-            {
-              title: 'Riman',
-              copy: 'K-beauty y wellness: Incellderm para el rostro, Botalab para el cuerpo y Lifening para colágeno de adentro hacia afuera.',
-              to: '/tienda?marca=riman',
-              seed: 'brand-riman'
-            }
-          ].map((item) => (
-            <button
-              key={item.title}
-              type="button"
-              onClick={() => go(item.to)}
-              className="group grid overflow-hidden bg-[#f6f6f6] text-left dark:bg-neutral-900 md:grid-cols-2"
-            >
-              <ProductVisual seed={item.seed} variant="hero" className="h-48 w-full md:h-full" />
-              <div className="flex flex-col justify-center p-6">
-                <h3 className="text-2xl font-medium tracking-tight">{item.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-neutral-600">{item.copy}</p>
-                <span className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em]">Shop now</span>
-              </div>
-            </button>
+          {homeStory.marcas.items.map((item) => (
+            <EditHotspot key={item.id} enabled={canEditCatalog} onEdit={openHomeMarcas} label="Editar marca">
+              <button
+                type="button"
+                onClick={() => go(item.to)}
+                className="group grid overflow-hidden bg-[#f6f6f6] text-left dark:bg-neutral-900 md:grid-cols-2"
+              >
+                <ProductVisual
+                  {...storyCardVisualProps(item)}
+                  variant="hero"
+                  className="h-48 w-full md:h-full"
+                />
+                <div className="flex flex-col justify-center p-6">
+                  <h3 className="text-2xl font-medium tracking-tight">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-neutral-600">{item.copy}</p>
+                  <span className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em]">{item.cta || 'Shop now'}</span>
+                </div>
+              </button>
+            </EditHotspot>
           ))}
         </div>
       </section>
@@ -523,13 +531,15 @@ export default function LandingPage() {
       </section>
 
       <section className="mx-auto grid max-w-[1440px] gap-8 px-5 py-8 lg:grid-cols-3 lg:px-16">
-        <article className="bg-neutral-950 p-8 text-white lg:col-span-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">Estética y bienestar</p>
-          <h2 className="mt-4 text-2xl font-medium">Un centro, cuatro capas</h2>
-          <p className="mt-4 text-sm leading-relaxed text-white/75">
-            Facial, corporal, bienestar y tienda. Elegimos marcas como fuXion y Riman según tu valoración, no por catálogo genérico.
-          </p>
-        </article>
+        <EditHotspot enabled={canEditCatalog} onEdit={openHomeEstetica} label="Editar bloque" tone="light" placement="left" className="lg:col-span-1">
+          <article className="h-full bg-neutral-950 p-8 text-white lg:col-span-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">{homeStory.estetica.tag}</p>
+            <h2 className="mt-4 text-2xl font-medium">{homeStory.estetica.title}</h2>
+            <p className="mt-4 text-sm leading-relaxed text-white/75">
+              {homeStory.estetica.copy}
+            </p>
+          </article>
+        </EditHotspot>
         <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
           {blogPosts.map((post) => (
             <EditHotspot key={post.id} enabled={canEditCatalog} onEdit={() => openBlog(post)}>

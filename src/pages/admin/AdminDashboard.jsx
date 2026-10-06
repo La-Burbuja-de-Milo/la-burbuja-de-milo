@@ -48,7 +48,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, loading } = useAuth();
-  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles, openLogo, openRewards, openHomeTabs } = useCmsEdit();
+  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica } = useCmsEdit();
   const gerente = isGerente(profile?.rol);
   const requestedTab = searchParams.get('tab') || 'resumen';
   const activeTab = ADMIN_TABS.includes(requestedTab) ? requestedTab : 'resumen';
@@ -430,6 +430,24 @@ export default function AdminDashboard() {
             <button type="button" onClick={openCategoryCircles} className={primaryBtn}>
               Editar círculos
             </button>
+          </div>
+
+          <div className={`${panel} space-y-4 p-6`}>
+            <div>
+              <h3 className="text-lg font-medium">Bloques de Inicio</h3>
+              <p className="text-sm text-neutral-500">Pasillos de la casa, Marcas en vitrina y el recuadro de Estética y bienestar: fotos, recorte y textos.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={openHomePasillos} className={primaryBtn}>
+                Editar pasillos
+              </button>
+              <button type="button" onClick={openHomeMarcas} className={primaryBtn}>
+                Editar marcas
+              </button>
+              <button type="button" onClick={openHomeEstetica} className={primaryBtn}>
+                Editar estética
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
