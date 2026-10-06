@@ -22,6 +22,7 @@ import { useAuth } from '../../context/AuthContext';
 import { CmsEditProvider, useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
 import { isGerente, isStaff } from '../../lib/roles';
 import { hasEditParam, navHrefForStaff, withoutEditParam } from '../../lib/visualEdit';
+import PublishCatalogButton from '../admin/PublishCatalogButton';
 
 const CATEGORY_LINKS = [
   { to: '/', label: 'Inicio', end: true },
@@ -167,6 +168,7 @@ function AppChrome() {
       {visualEditActive && (
         <div className="flex flex-wrap items-center justify-center gap-3 bg-neutral-900 px-4 py-2 text-[12px] text-white">
           <span>Modo edición. Cambia foto, texto o precio en cada bloque.</span>
+          <PublishCatalogButton variant="bar" />
           <Link to="/admin" className="underline underline-offset-2">Volver al panel</Link>
           <Link to={withoutEditParam(`${location.pathname}${location.search}`)} className="text-white/70 hover:text-white">
             Ver como cliente

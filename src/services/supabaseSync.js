@@ -10,7 +10,8 @@ const KEYS = {
   SERVICIOS: 'milo_servicios',
   CLIENTES: 'milo_clientes',
   BLOG: 'milo_blog',
-  MOVIMIENTOS: 'milo_movimientos'
+  MOVIMIENTOS: 'milo_movimientos',
+  AJUSTES: 'milo_ajustes'
 };
 
 function toIsoDate(value) {
@@ -111,7 +112,8 @@ export function mapBannerFromDb(row) {
     imagenes: Array.isArray(row.imagenes) ? row.imagenes : (row.imagen ? [row.imagen] : []),
     marcoLayout: row.marco_layout || '',
     marcoEstilo: row.marco_estilo || '',
-    transicion: row.transicion || ''
+    transicion: row.transicion || '',
+    updatedAt: row.updated_at || null
   };
 }
 
@@ -308,6 +310,123 @@ function mapMovimientoFromDb(row) {
   };
 }
 
+export function mapAjustesFromDb(row) {
+  if (!row) return null;
+  return {
+    promoActivo: row.promo_activo !== false,
+    promoTexto: row.promo_texto || '',
+    categoryCircles: Array.isArray(row.category_circles) ? row.category_circles : [],
+    categoryCirclesAlign: row.category_circles_align || 'start',
+    newsletterEmails: Array.isArray(row.newsletter_emails) ? row.newsletter_emails : [],
+    updatedAt: row.updated_at || null
+  };
+}
+
+function mapAjustesToDb(ajustes) {
+  return {
+    id: 'site',
+    promo_activo: ajustes?.promoActivo !== false,
+    promo_texto: ajustes?.promoTexto || null,
+    category_circles: Array.isArray(ajustes?.categoryCircles) ? ajustes.categoryCircles : [],
+    category_circles_align: ajustes?.categoryCirclesAlign || 'start',
+    newsletter_emails: Array.isArray(ajustes?.newsletterEmails) ? ajustes.newsletterEmails : []
+  };
+}
+
+function mimeFromDataUrl(value) {
+  const match = String(value || '').match(/^data:([^;]+)/);
+  return match?.[1] || 'image/jpeg';
+}
+
+function extFromMime(mime) {
+  if (String(mime).includes('png')) return 'png';
+  if (String(mime).includes('webp')) return 'webp';
+  if (String(mime).includes('gif')) return 'gif';
+  return 'jpg';
+}
+
+function isInlineImage(value) {
+  return typeof value === 'string' && (value.startsWith('data:') || value.startsWith('blob:'));
+}
+
+async function uploadVitrinaAsset(pathBase, src) {
+  if (!supabase || !isInlineImage(src)) return src;
+  const mime = src.startsWith('data:') ? mimeFromDataUrl(src) : 'image/jpeg';
+  const ext = extFromMime(mime);
+  const path = `${pathBase}.${ext}`;
+  let blob;
+  try {
+    const response = await fetch(src);
+    blob = await response.blob();
+  } catch {
+    return src;
+  }
+  const { error } = await supabase.storage.from('vitrina').upload(path, blob, {
+    upsert: true,
+    contentType: blob.type || mime
+  });
+  if (error) {
+    console.warn('No se pudo subir la foto a vitrina:', error.message || error);
+    return src;
+  }
+  const { data } = supabase.storage.from('vitrina').getPublicUrl(path);
+  return data?.publicUrl || src;
+}
+
+async function persistBannerImages(banners) {
+  const next = [];
+  for (const banner of banners || []) {
+    const cloned = cloneBanner(banner);
+    const fotos = Array.isArray(cloned.imagenes)
+      ? cloned.imagenes
+      : (cloned.imagen ? [cloned.imagen] : []);
+    const imagenes = [];
+    for (let index = 0; index < fotos.length; index += 1) {
+      const foto = normalizeBannerFoto(fotos[index]);
+      if (!foto.src) continue;
+      imagenes.push({
+        ...foto,
+        src: await uploadVitrinaAsset(`banners/${cloned.id}/${index}`, foto.src)
+      });
+    }
+    next.push({
+      ...cloned,
+      imagenes,
+      imagen: imagenes[0]?.src || bannerFotoSrc(cloned.imagen) || ''
+    });
+  }
+  return next;
+}
+
+async function persistAjustesImages(ajustes) {
+  const circles = Array.isArray(ajustes?.categoryCircles) ? ajustes.categoryCircles : [];
+  const categoryCircles = [];
+  for (const circle of circles) {
+    const imagen = circle?.imagen
+      ? await uploadVitrinaAsset(`circles/${circle.id || 'item'}`, circle.imagen)
+      : circle?.imagen;
+    categoryCircles.push({ ...circle, imagen });
+  }
+  return { ...ajustes, categoryCircles };
+}
+
+function friendlySyncError(label, error) {
+  const msg = error?.message || String(error || '');
+  if (/row-level security|RLS/i.test(msg)) {
+    return `Supabase rechazó ${label}: inicia sesión como gerente o aplica la migración de vitrina (rol gerente).`;
+  }
+  if (/schema cache|does not exist|Could not find the table/i.test(msg)) {
+    return `Falta ${label} en Supabase. Ejecuta supabase/migrations/20261006090000_vitrina_publicar.sql en el SQL Editor.`;
+  }
+  return `No se pudo guardar ${label}: ${msg}`;
+}
+
+async function upsertAjustes(ajustes) {
+  if (!supabase || !ajustes) return;
+  const { error } = await supabase.from('ajustes').upsert(mapAjustesToDb(ajustes));
+  if (error) throw error;
+}
+
 function mapMovimientoToDb(movimiento) {
   return {
     id: movimiento.id,
@@ -424,6 +543,11 @@ export async function hydrateFromSupabase(writeLocal) {
     writeLocal(KEYS.MOVIMIENTOS, movimientos.data.map(mapMovimientoFromDb));
   }
 
+  const ajustes = await supabase.from('ajustes').select('*').eq('id', 'site').maybeSingle();
+  if (!ajustes.error && ajustes.data) {
+    writeLocal(KEYS.AJUSTES, mapAjustesFromDb(ajustes.data));
+  }
+
   return true;
 }
 
@@ -438,6 +562,9 @@ export function syncStoreKey(key, data) {
   if (!isSupabaseConfigured || !supabase) return;
 
   const task = (async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session) return;
+
     switch (key) {
       case KEYS.PRODUCTOS:
         await upsertRows('productos', data, mapProductoToDb);
@@ -463,6 +590,9 @@ export function syncStoreKey(key, data) {
       case KEYS.MOVIMIENTOS:
         await replaceRows('inventario_movimientos', data, mapMovimientoToDb);
         break;
+      case KEYS.AJUSTES:
+        await upsertAjustes(data);
+        break;
       default:
         break;
     }
@@ -471,4 +601,38 @@ export function syncStoreKey(key, data) {
   task.catch((error) => {
     console.warn(`Supabase aún no pudo guardar ${key}:`, error.message || error);
   });
+}
+
+export async function publishCatalogToSupabase({ banners, ajustes, persistLocal } = {}) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { ok: false, error: 'Supabase no está configurado en este entorno.' };
+  }
+
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session) {
+    return { ok: false, error: 'Inicia sesión como gerente en este mismo navegador para publicar.' };
+  }
+
+  const bannersReady = await persistBannerImages(banners);
+  const ajustesReady = await persistAjustesImages(ajustes);
+  if (typeof persistLocal === 'function') {
+    persistLocal({ banners: bannersReady, ajustes: ajustesReady });
+  }
+
+  const errors = [];
+  try {
+    await replaceRows('banners', bannersReady, mapBannerToDb);
+  } catch (error) {
+    errors.push(friendlySyncError('banners', error));
+  }
+  try {
+    await upsertAjustes(ajustesReady);
+  } catch (error) {
+    errors.push(friendlySyncError('ajustes', error));
+  }
+
+  if (errors.length) {
+    return { ok: false, error: errors.join(' ') };
+  }
+  return { ok: true, message: 'Banners, círculos y barra promocional ya están en el sitio.' };
 }

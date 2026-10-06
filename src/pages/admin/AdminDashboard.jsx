@@ -9,6 +9,7 @@ import { BannerStage } from '../../components/shop/BannerFrame';
 import EquipoTab from './components/EquipoTab';
 import CatalogLists from './components/CatalogLists';
 import InventarioTab from './components/InventarioTab';
+import PublishCatalogButton from '../../components/admin/PublishCatalogButton';
 import { useAuth } from '../../context/AuthContext';
 import { useCmsEdit } from '../../context/CmsEditContext';
 import { isGerente } from '../../lib/roles';
@@ -160,6 +161,7 @@ export default function AdminDashboard() {
           : 'Agenda, CRM y ficha clínica que se publica en Mi Burbuja.'}
         actions={
           <div className="flex items-center gap-2">
+            {gerente ? <PublishCatalogButton /> : null}
             <button type="button" onClick={() => navigate(gerente ? '/?editar=1' : '/')} className="border border-neutral-900 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] dark:border-white">
               {gerente ? 'Editar en sitio' : 'Ver sitio'}
             </button>
@@ -385,7 +387,7 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-medium">Banners de Inicio</h3>
-              <p className="text-sm text-neutral-500">Título, botones y fotografía del hero que recorre el cliente.</p>
+              <p className="text-sm text-neutral-500">Título, botones y fotografía del hero. Para verlos en producción, publica al sitio desde este mismo navegador.</p>
             </div>
             <button type="button" onClick={() => handleOpenBannerModal()} className={primaryBtn}>
               <Plus className="h-4 w-4" /> Nuevo banner

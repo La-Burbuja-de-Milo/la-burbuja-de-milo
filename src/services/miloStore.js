@@ -2,7 +2,7 @@
  * Almacén reactivo y persistente central para La Burbuja de Milo (CRM, Tienda, Citas y CMS)
  */
 
-import { deleteRemoteRow, hydrateFromSupabase, syncStoreKey } from './supabaseSync';
+import { deleteRemoteRow, hydrateFromSupabase, publishCatalogToSupabase, syncStoreKey } from './supabaseSync';
 import { COP_CODE, toCopAmount } from '../lib/money';
 import { esStockGenerico, findVariante, hasNamedVariantes, stockEstado, withVariantes } from '../lib/variantes';
 import { cloneBanner, withBannerFrames } from '../lib/bannerFrames';
@@ -786,6 +786,98 @@ function parseStamp(value) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function stampNow() {
+  return new Date().toISOString();
+}
+
+function bannerPhotoWeight(banner) {
+  const fotos = Array.isArray(banner?.imagenes) ? banner.imagenes : [];
+  const srcs = fotos
+    .map((item) => (typeof item === 'string' ? item : item?.src || ''))
+    .filter(Boolean);
+  if (!srcs.length && banner?.imagen) {
+    srcs.push(typeof banner.imagen === 'string' ? banner.imagen : banner.imagen.src || '');
+  }
+  return {
+    hasLocal: srcs.some((src) => String(src).startsWith('data:') || String(src).startsWith('blob:')),
+    bytes: srcs.reduce((total, src) => total + String(src).length, 0),
+    stamp: parseStamp(banner?.updatedAt)
+  };
+}
+
+function pickRicherBanner(local, remote) {
+  if (!local) return remote;
+  if (!remote) return local;
+  const localWeight = bannerPhotoWeight(local);
+  const remoteWeight = bannerPhotoWeight(remote);
+  if (localWeight.hasLocal && !remoteWeight.hasLocal) return local;
+  if (remoteWeight.hasLocal && !localWeight.hasLocal) return remote;
+  if (localWeight.bytes !== remoteWeight.bytes) {
+    return localWeight.bytes > remoteWeight.bytes ? local : remote;
+  }
+  if (localWeight.stamp !== remoteWeight.stamp) {
+    return localWeight.stamp >= remoteWeight.stamp ? local : remote;
+  }
+  return local;
+}
+
+function mergeBannersPreferLocal(local, remote) {
+  const localList = Array.isArray(local) ? local : [];
+  const remoteList = Array.isArray(remote) ? remote : [];
+  const localMap = new Map(localList.map((item) => [item.id, item]));
+  const remoteMap = new Map(remoteList.map((item) => [item.id, item]));
+  const seen = new Set();
+  const order = [
+    ...localList.map((item) => item.id),
+    ...remoteList.map((item) => item.id)
+  ].filter((id) => {
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  return order.map((id) => pickRicherBanner(localMap.get(id), remoteMap.get(id)));
+}
+
+function circlesHavePhotos(circles) {
+  return (circles || []).some((circle) => String(circle?.imagen || '').length > 20);
+}
+
+function circlesHaveInlinePhotos(circles) {
+  return (circles || []).some((circle) => {
+    const src = String(circle?.imagen || '');
+    return src.startsWith('data:') || src.startsWith('blob:');
+  });
+}
+
+function mergeAjustesPreferLocal(local, remote) {
+  if (!local) return remote || null;
+  if (!remote) return local;
+  const localCircles = Array.isArray(local.categoryCircles) ? local.categoryCircles : [];
+  const remoteCircles = Array.isArray(remote.categoryCircles) ? remote.categoryCircles : [];
+  const localHasPhotos = circlesHavePhotos(localCircles);
+  const remoteHasPhotos = circlesHavePhotos(remoteCircles);
+  const localIsNewer = parseStamp(local.updatedAt) >= parseStamp(remote.updatedAt);
+  const keepLocalCircles = circlesHaveInlinePhotos(localCircles)
+    || (localHasPhotos && !remoteHasPhotos)
+    || (localHasPhotos && remoteHasPhotos && localIsNewer);
+  const keepLocalPromo = localIsNewer;
+  return {
+    ...remote,
+    ...local,
+    promoActivo: keepLocalPromo ? local.promoActivo : remote.promoActivo,
+    promoTexto: keepLocalPromo ? (local.promoTexto || remote.promoTexto) : (remote.promoTexto || local.promoTexto),
+    categoryCircles: keepLocalCircles ? localCircles : remoteCircles,
+    categoryCirclesAlign: keepLocalCircles
+      ? (local.categoryCirclesAlign || remote.categoryCirclesAlign)
+      : (remote.categoryCirclesAlign || local.categoryCirclesAlign),
+    newsletterEmails: [...new Set([
+      ...(Array.isArray(remote.newsletterEmails) ? remote.newsletterEmails : []),
+      ...(Array.isArray(local.newsletterEmails) ? local.newsletterEmails : [])
+    ])],
+    updatedAt: keepLocalPromo ? local.updatedAt : remote.updatedAt
+  };
+}
+
 function mergeProductosPreferLocal(local, remote) {
   const localList = Array.isArray(local) ? local : [];
   const remoteList = Array.isArray(remote) ? remote : [];
@@ -915,20 +1007,25 @@ export async function hydrateMiloStore() {
     [STORAGE_KEYS.BLOG]: SEED_BLOG,
     [STORAGE_KEYS.MARCAS]: SEED_MARCAS,
     [STORAGE_KEYS.ETIQUETAS]: SEED_ETIQUETAS,
-    [STORAGE_KEYS.MOVIMIENTOS]: []
+    [STORAGE_KEYS.MOVIMIENTOS]: [],
+    [STORAGE_KEYS.AJUSTES]: SEED_AJUSTES
   };
   await hydrateFromSupabase((key, data) => {
-    const merged = key === STORAGE_KEYS.PRODUCTOS
-      ? mergeProductosPreferLocal(readRaw(key), data)
-      : data;
-    saveData(key, applyCatalogMerge(key, merged, seedByKey[key]), { sync: false });
+    let merged = data;
+    if (key === STORAGE_KEYS.PRODUCTOS) merged = mergeProductosPreferLocal(readRaw(key), data);
+    if (key === STORAGE_KEYS.BANNERS) merged = mergeBannersPreferLocal(readRaw(key), data);
+    if (key === STORAGE_KEYS.AJUSTES) merged = mergeAjustesPreferLocal(readRaw(key), data);
+    saveData(key, applyCatalogMerge(key, merged ?? seedByKey[key], seedByKey[key] ?? merged), { sync: false });
   });
 }
 
 export const MiloStore = {
   // === BANNERS ===
   getBanners: () => loadData(STORAGE_KEYS.BANNERS, SEED_BANNERS).map((banner) => withBannerFrames(cloneBanner(banner))),
-  saveBanners: (banners) => saveData(STORAGE_KEYS.BANNERS, (banners || []).map(cloneBanner)),
+  saveBanners: (banners) => saveData(
+    STORAGE_KEYS.BANNERS,
+    (banners || []).map((banner) => cloneBanner({ ...banner, updatedAt: stampNow() }))
+  ),
   addBanner: (banner) => {
     const current = loadData(STORAGE_KEYS.BANNERS, SEED_BANNERS).map(cloneBanner);
     const newBanner = withBannerFrames({ ...cloneBanner(banner), id: `b_${Date.now()}` });
@@ -1447,7 +1544,12 @@ export const MiloStore = {
       categoryCirclesAlign: ajustes.categoryCirclesAlign ?? current.categoryCirclesAlign
     };
     const { circles, align } = withCategoryCircles(merged);
-    saveData(STORAGE_KEYS.AJUSTES, { ...merged, categoryCircles: circles, categoryCirclesAlign: align }, { sync: false });
+    saveData(STORAGE_KEYS.AJUSTES, {
+      ...merged,
+      categoryCircles: circles,
+      categoryCirclesAlign: align,
+      updatedAt: stampNow()
+    });
   },
   addNewsletterEmail: (email) => {
     const current = MiloStore.getAjustes();
@@ -1474,5 +1576,14 @@ export const MiloStore = {
     localStorage.removeItem(STORAGE_KEYS.ETIQUETAS);
     localStorage.removeItem(STORAGE_KEYS.MOVIMIENTOS);
     window.location.reload();
-  }
+  },
+
+  publishCatalog: () => publishCatalogToSupabase({
+    banners: loadData(STORAGE_KEYS.BANNERS, SEED_BANNERS).map(cloneBanner),
+    ajustes: MiloStore.getAjustes(),
+    persistLocal: ({ banners, ajustes }) => {
+      saveData(STORAGE_KEYS.BANNERS, (banners || []).map(cloneBanner), { sync: false });
+      saveData(STORAGE_KEYS.AJUSTES, ajustes, { sync: false });
+    }
+  })
 };
