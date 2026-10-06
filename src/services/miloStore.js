@@ -880,8 +880,7 @@ function mergeAjustesPreferLocal(local, remote) {
   const remoteLogo = normalizeSiteLogo(remote.logo);
   const keepLocalLogo = logoHasInlinePhoto(localLogo)
     || (logoHasPhoto(localLogo) && !logoHasPhoto(remoteLogo))
-    || (logoHasPhoto(localLogo) && logoHasPhoto(remoteLogo) && localIsNewer)
-    || localIsNewer;
+    || (logoHasPhoto(localLogo) && logoHasPhoto(remoteLogo) && localIsNewer);
   return {
     ...remote,
     ...local,
