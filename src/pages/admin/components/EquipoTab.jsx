@@ -2,16 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { UserPlus, Shield } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../context/AuthContext';
-import GlassCard from '../../../components/ui/GlassCard';
-import AuroraButton from '../../../components/ui/AuroraButton';
 import { ROLE_HINTS, ROLE_LABELS, ROLES, isGerente } from '../../../lib/roles';
 
 const ROLE_OPTIONS = [ROLES.GERENTE, ROLES.ASESOR, ROLES.USUARIO];
+const inputClass = 'border border-neutral-300 bg-white px-3 py-2.5 text-sm text-neutral-900 outline-none focus:border-neutral-900 dark:border-neutral-500 dark:bg-neutral-950 dark:text-white dark:focus:border-white';
+const panel = 'border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-950';
 
-function roleBadgeClass(rol) {
-  if (rol === ROLES.GERENTE) return 'bg-rose-500/15 text-rose-500';
-  if (rol === ROLES.ASESOR) return 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400';
-  return 'bg-pink-500/15 text-pink-600 dark:text-pink-400';
+function roleLabel(rol) {
+  return ROLE_LABELS[rol] || rol;
 }
 
 export default function EquipoTab() {
@@ -65,7 +63,7 @@ export default function EquipoTab() {
         setErrorMessage(error.message);
         return;
       }
-      setMessage(`${existing.email} ahora es ${ROLE_LABELS[form.rol]}.`);
+      setMessage(`${existing.email} ahora es ${roleLabel(form.rol)}.`);
       setForm({ nombre: '', email: '', rol: ROLES.ASESOR });
       await loadEquipo();
       return;
@@ -104,7 +102,7 @@ export default function EquipoTab() {
       return;
     }
 
-    setMessage(`Invitación enviada a ${email} como ${ROLE_LABELS[form.rol]}.`);
+    setMessage(`Invitación enviada a ${email} como ${roleLabel(form.rol)}.`);
     setForm({ nombre: '', email: '', rol: ROLES.ASESOR });
     await loadEquipo();
   };
@@ -124,24 +122,24 @@ export default function EquipoTab() {
 
   return (
     <div className="space-y-6">
-      <GlassCard className="p-5 sm:p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-sm">
-            <UserPlus className="w-4 h-4 text-white" />
+      <div className="border border-neutral-200 p-5 sm:p-6 dark:border-neutral-700">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center border border-neutral-900 dark:border-white">
+            <UserPlus className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Crear cuenta del equipo</h3>
-            <p className="text-xs text-gray-500">El correo recibe un enlace mágico y entra con el rol que elijas.</p>
+            <h3 className="text-base font-medium">Crear cuenta del equipo</h3>
+            <p className="text-sm text-neutral-500">El correo recibe un enlace y entra con el rol que elijas.</p>
           </div>
         </div>
 
-        <form onSubmit={handleInvite} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <form onSubmit={handleInvite} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <input
             type="text"
             placeholder="Nombre"
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm text-gray-900 dark:text-white"
+            className={inputClass}
           />
           <input
             type="email"
@@ -149,12 +147,12 @@ export default function EquipoTab() {
             placeholder="correo@equipo.com"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm text-gray-900 dark:text-white"
+            className={inputClass}
           />
           <select
             value={form.rol}
             onChange={(e) => setForm({ ...form, rol: e.target.value })}
-            className="px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm text-gray-900 dark:text-white"
+            className={inputClass}
           >
             {ROLE_OPTIONS.map((rol) => (
               <option key={rol} value={rol}>
@@ -162,52 +160,56 @@ export default function EquipoTab() {
               </option>
             ))}
           </select>
-          <AuroraButton type="submit" className="w-full py-2.5 text-xs font-semibold" disabled={isSaving}>
-            {isSaving ? 'Enviando...' : 'Invitar y enviar acceso'}
-          </AuroraButton>
+          <button
+            type="submit"
+            className="bg-neutral-900 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900"
+            disabled={isSaving}
+          >
+            {isSaving ? 'Enviando...' : 'Invitar'}
+          </button>
         </form>
 
-        <p className="mt-3 text-[11px] text-gray-400">{ROLE_HINTS[form.rol]}</p>
-        {message ? <p className="mt-2 text-xs text-emerald-500">{message}</p> : null}
-        {errorMessage ? <p className="mt-2 text-xs text-rose-500">{errorMessage}</p> : null}
-      </GlassCard>
+        <p className="mt-3 text-[11px] text-neutral-400">{ROLE_HINTS[form.rol]}</p>
+        {message ? <p className="mt-2 text-xs text-neutral-700 dark:text-neutral-300">{message}</p> : null}
+        {errorMessage ? <p className="mt-2 text-xs text-neutral-900 dark:text-white">{errorMessage}</p> : null}
+      </div>
 
       {pendientes.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Invitaciones pendientes</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <h4 className="text-sm font-medium">Invitaciones pendientes</h4>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {pendientes.map((item) => (
-              <GlassCard key={item.id} className="p-4 flex items-center justify-between gap-3">
+              <div key={item.id} className={`${panel} flex items-center justify-between gap-3`}>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.nombre || item.email}</p>
-                  <p className="text-xs text-gray-500">{item.email}</p>
+                  <p className="text-sm font-medium">{item.nombre || item.email}</p>
+                  <p className="text-xs text-neutral-500">{item.email}</p>
                 </div>
-                <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${roleBadgeClass(item.rol)}`}>
-                  {ROLE_LABELS[item.rol]}
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                  {roleLabel(item.rol)}
                 </span>
-              </GlassCard>
+              </div>
             ))}
           </div>
         </div>
       )}
 
       <div className="space-y-2">
-        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Cuentas activas</h4>
+        <h4 className="text-sm font-medium">Cuentas activas</h4>
         <div className="grid grid-cols-1 gap-3">
           {cuentas.map((cuenta) => (
-            <GlassCard key={cuenta.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div key={cuenta.id} className={`${panel} flex flex-col justify-between gap-3 sm:flex-row sm:items-center`}>
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center">
-                  <Shield className="w-4 h-4" />
+                <div className="flex h-9 w-9 items-center justify-center border border-neutral-900 dark:border-white">
+                  <Shield className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium">
                     {cuenta.nombre || 'Sin nombre'}
                     {cuenta.id === session?.user?.id ? (
-                      <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-400">Tú</span>
+                      <span className="ml-2 text-[10px] uppercase tracking-wide text-neutral-400">Tú</span>
                     ) : null}
                   </p>
-                  <p className="text-xs text-gray-500">{cuenta.email}</p>
+                  <p className="text-xs text-neutral-500">{cuenta.email}</p>
                 </div>
               </div>
 
@@ -215,7 +217,7 @@ export default function EquipoTab() {
                 <select
                   value={cuenta.rol}
                   onChange={(e) => handleRoleChange(cuenta.id, e.target.value)}
-                  className="px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs font-semibold text-gray-900 dark:text-white"
+                  className={`${inputClass} text-xs font-semibold`}
                 >
                   {ROLE_OPTIONS.map((rol) => (
                     <option key={rol} value={rol}>
@@ -224,11 +226,11 @@ export default function EquipoTab() {
                   ))}
                 </select>
               ) : (
-                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase ${roleBadgeClass(cuenta.rol)}`}>
-                  {ROLE_LABELS[cuenta.rol] || cuenta.rol}
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                  {roleLabel(cuenta.rol)}
                 </span>
               )}
-            </GlassCard>
+            </div>
           ))}
         </div>
       </div>

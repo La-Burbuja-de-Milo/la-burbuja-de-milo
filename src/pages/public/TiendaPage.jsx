@@ -1,25 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { MiloStore } from '../../services/miloStore';
-import PageHeader from '../../components/ui/PageHeader';
-import GlassCard from '../../components/ui/GlassCard';
-import AuroraButton from '../../components/ui/AuroraButton';
-import { Sparkles, Clock, ShoppingBag, Check, Info, X, ShieldCheck } from 'lucide-react';
+import ProductCard from '../../components/shop/ProductCard';
+import ProductVisual from '../../components/shop/ProductVisual';
+import { Clock, ShoppingBag, Check, X, ShieldCheck } from 'lucide-react';
+import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
+import { formatCOP } from '../../lib/money';
+import PresentacionPicker from '../../components/shop/PresentacionPicker';
+import { findVariante, stockEstado } from '../../lib/variantes';
+import { pasilloLabels, productInPasillo, productPasillos } from '../../lib/pasillos';
 
 export default function TiendaPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { canEditCatalog } = useVisualEdit();
+  const { openProduct } = useCmsEdit();
   const filtroParam = searchParams.get('filtro');
+  const pasilloParam = searchParams.get('pasillo');
+  const queryParam = searchParams.get('q') || '';
+  const marcaParam = (searchParams.get('marca') || '').toLowerCase();
 
   const [pasillos, setPasillos] = useState([]);
   const [productos, setProductos] = useState([]);
-  const [activePasillo, setActivePasillo] = useState('todos');
+  const [marcas, setMarcas] = useState([]);
+  const activePasillo = marcaParam ? '' : (pasilloParam || 'todos');
   const [filtroTipo, setFiltroTipo] = useState(filtroParam === 'en-camino' ? 'en-camino' : 'todos');
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedVarianteId, setSelectedVarianteId] = useState('');
   const [addedNotice, setAddedNotice] = useState(null);
 
   const loadData = () => {
     setPasillos(MiloStore.getPasillos());
     setProductos(MiloStore.getProductos());
+    setMarcas(MiloStore.getMarcas());
   };
 
   useEffect(() => {
@@ -29,57 +41,84 @@ export default function TiendaPage() {
   }, []);
 
   useEffect(() => {
-    if (filtroParam === 'en-camino') {
-      setFiltroTipo('en-camino');
-    }
+    if (filtroParam === 'en-camino') setFiltroTipo('en-camino');
   }, [filtroParam]);
 
-  // Filtrado de productos
   const filteredProducts = productos.filter((p) => {
-    // Filtro por pasillo
-    if (activePasillo !== 'todos' && p.pasillo !== activePasillo) {
-      return false;
-    }
-    // Filtro por disponibilidad / en camino
+    if (!marcaParam && activePasillo && activePasillo !== 'todos' && !productInPasillo(p, activePasillo)) return false;
     if (filtroTipo === 'disponibles' && p.enCamino) return false;
     if (filtroTipo === 'en-camino' && !p.enCamino) return false;
+    if (queryParam) {
+      const q = queryParam.toLowerCase();
+      const haystack = `${p.nombre} ${p.descripcion} ${p.ingredientes || ''} ${productPasillos(p).join(' ')} ${p.marca || ''}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    if (marcaParam && String(p.marca || '').toLowerCase() !== marcaParam) return false;
     return true;
   });
 
-  const countEnCamino = productos.filter(p => p.enCamino).length;
+  const countEnCamino = productos.filter((p) => p.enCamino).length;
 
-  const handleAddToCart = (producto, tipo) => {
-    MiloStore.addToCarrito(producto, tipo);
-    setAddedNotice(`${producto.nombre} añadido a tu bolsa ✨`);
+  const handleAddToCart = (producto, tipo, varianteId) => {
+    const added = MiloStore.addToCarrito(producto, tipo, varianteId);
+    const variante = findVariante(producto, varianteId);
+    const label = variante?.nombre ? `${producto.nombre} · ${variante.nombre}` : producto.nombre;
+    if (!added) {
+      setAddedNotice(`No hay stock de ${label}`);
+    } else {
+      setAddedNotice(`${label} añadido a tu bolsa`);
+    }
     setTimeout(() => setAddedNotice(null), 2500);
   };
 
-  return (
-    <div className="flex flex-col gap-6">
-      <PageHeader 
-        title="Tienda Ética & Pasillos" 
-        description="Fórmulas botánicas puras, cosmecéutica de alta penetración y productos exclusivos en camino."
-        glow="default"
-      />
+  const selectPasillo = (id) => {
+    const next = new URLSearchParams(searchParams);
+    if (id === 'todos') next.delete('pasillo');
+    else next.set('pasillo', id);
+    next.delete('marca');
+    setSearchParams(next);
+  };
 
-      {/* Alerta de confirmación rápida */}
+  const selectMarca = (marca) => {
+    const next = new URLSearchParams(searchParams);
+    const value = String(marca.nombre || '').toLowerCase();
+    const active = marcaParam === value || marcaParam === marca.id;
+    if (active) {
+      next.delete('marca');
+    } else {
+      next.set('marca', value);
+      next.delete('pasillo');
+    }
+    setSearchParams(next);
+  };
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div>
+        <h1 className="text-3xl font-medium tracking-tight text-neutral-900 dark:text-white">Tienda</h1>
+        <p className="mt-2 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
+          Salud estética para rostro, cuerpo y bienestar. Marcas como fuXion, Riman y fórmulas de cabina.
+          {queryParam ? ` Resultados para “${queryParam}”.` : ''}
+          {marcaParam ? ` Filtro de marca: ${marcaParam}.` : ''}
+        </p>
+      </div>
+
       {addedNotice && (
-        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white dark:bg-white dark:text-gray-900 px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-semibold animate-in slide-in-from-bottom duration-300">
-          <Check className="w-4 h-4 text-emerald-400" />
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-neutral-900 px-4 py-2.5 text-xs font-medium text-white shadow-lg">
+          <Check className="w-4 h-4" />
           <span>{addedNotice}</span>
         </div>
       )}
 
-      {/* NAVEGACIÓN POR PASILLOS (TABS HORIZONTALES) */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 apple-scroll -mx-3 px-3 sm:mx-0 sm:px-0">
         {pasillos.map((pas) => (
           <button
             key={pas.id}
-            onClick={() => setActivePasillo(pas.id)}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all ${
+            onClick={() => selectPasillo(pas.id)}
+            className={`whitespace-nowrap px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-all ${
               activePasillo === pas.id
-                ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-md shadow-gray-500/10'
-                : 'bg-white/60 dark:bg-white/5 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-white/10 border border-gray-200/50 dark:border-white/5'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                : 'border border-neutral-200 text-neutral-600 hover:border-neutral-900 dark:border-neutral-800 dark:text-neutral-400'
             }`}
           >
             {pas.nombre}
@@ -87,255 +126,226 @@ export default function TiendaPage() {
         ))}
       </div>
 
-      {/* FILTRO DE DISPONIBILIDAD Y EN CAMINO */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-gray-100/70 dark:bg-white/5 border border-gray-200/60 dark:border-white/5">
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 apple-scroll -mx-3 px-3 sm:mx-0 sm:px-0">
+        {marcas.map((marca) => {
+          const active = marcaParam === marca.nombre.toLowerCase() || marcaParam === marca.id;
+          return (
+            <button
+              key={marca.id}
+              type="button"
+              onClick={() => selectMarca(marca)}
+              className={`whitespace-nowrap px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                active
+                  ? 'bg-neutral-900 text-white'
+                  : 'text-neutral-500 hover:text-neutral-900'
+              }`}
+            >
+              {marca.nombre}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-neutral-200 py-3 dark:border-neutral-800">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setFiltroTipo('todos')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-all ${
               filtroTipo === 'todos'
-                ? 'bg-white dark:bg-white/20 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
             }`}
           >
             Todos ({productos.length})
           </button>
-          
+
           <button
             onClick={() => setFiltroTipo('disponibles')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-all ${
               filtroTipo === 'disponibles'
-                ? 'bg-white dark:bg-white/20 text-emerald-600 dark:text-emerald-300 shadow-sm'
-                : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
             }`}
           >
-            Disponibles en Cabina
+            Disponibles
           </button>
-          
+
           <button
             onClick={() => setFiltroTipo('en-camino')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-all ${
               filtroTipo === 'en-camino'
-                ? 'bg-purple-600 text-white shadow-sm shadow-purple-500/30'
-                : 'text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40'
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>En Camino / Apartar ({countEnCamino})</span>
+            <span>En camino ({countEnCamino})</span>
           </button>
         </div>
 
-        <span className="text-xs text-gray-500 dark:text-gray-400">
+        <span className="text-xs text-neutral-500">
           Mostrando {filteredProducts.length} productos
         </span>
       </div>
 
-      {/* GRID DE PRODUCTOS */}
       {filteredProducts.length === 0 ? (
-        <div className="p-12 text-center flex flex-col items-center justify-center space-y-3">
-          <div className="w-14 h-14 rounded-full bg-gray-100 dark:bg-white/5 text-gray-400 flex items-center justify-center">
+        <div className="flex flex-col items-center justify-center space-y-3 p-12 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-neutral-100 text-neutral-400 dark:bg-neutral-900">
             <ShoppingBag className="w-6 h-6" />
           </div>
-          <p className="text-base font-medium text-gray-900 dark:text-white">No encontramos productos en este pasillo con el filtro seleccionado</p>
+          <p className="text-base font-medium text-neutral-900 dark:text-white">
+            No encontramos productos con el filtro seleccionado
+          </p>
           <button
-            onClick={() => { setActivePasillo('todos'); setFiltroTipo('todos'); }}
-            className="text-xs text-pink-600 dark:text-pink-400 font-semibold hover:underline"
+            onClick={() => {
+              setFiltroTipo('todos');
+              setSearchParams({});
+            }}
+            className="text-xs font-semibold uppercase tracking-[0.14em] underline"
           >
-            Ver todos los productos disponibles
+            Ver todos los productos
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 items-stretch gap-x-4 gap-y-10 md:grid-cols-3 lg:grid-cols-4">
           {filteredProducts.map((prod) => (
-            <GlassCard 
-              key={prod.id} 
-              className={`flex flex-col justify-between group transition-all duration-300 p-5 ${
-                prod.enCamino 
-                  ? 'border-purple-300/60 dark:border-purple-500/30 shadow-purple-500/5' 
-                  : 'hover:shadow-md'
-              }`}
-            >
-              {/* Encabezado de la tarjeta */}
-              <div>
-                <div className="w-full aspect-[4/3] bg-gradient-to-br from-gray-100 to-gray-200/50 dark:from-gray-900/60 dark:to-gray-800/40 rounded-2xl mb-3 flex items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-pink-500/5 to-purple-500/10 group-hover:scale-105 transition-transform duration-500" />
-                  
-                  {/* Icono temático */}
-                  <Sparkles className="w-10 h-10 text-gray-300 dark:text-gray-600 group-hover:scale-110 group-hover:text-pink-400 transition-all duration-300" />
-
-                  {/* Etiquetas / Badges */}
-                  <div className="absolute top-3 left-3 flex flex-col gap-1">
-                    {prod.enCamino ? (
-                      <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-purple-600 text-white rounded-md shadow-sm">
-                        En Camino
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider bg-white/90 dark:bg-black/60 backdrop-blur-md text-gray-900 dark:text-white rounded-md">
-                        {prod.tag || 'Disponible'}
-                      </span>
-                    )}
-                  </div>
-
-                  {prod.enCamino && (
-                    <span className="absolute bottom-3 left-3 right-3 px-2 py-1 text-[10px] text-center font-medium bg-purple-900/80 backdrop-blur-md text-white rounded-md">
-                      Llegada estimada: {prod.fechaLlegada || 'Próximamente'}
-                    </span>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400">
-                      {prod.pasillo}
-                    </span>
-                    <button
-                      onClick={() => setSelectedProduct(prod)}
-                      className="text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
-                      title="Ver detalles de la fórmula"
-                    >
-                      <Info className="w-4 h-4" />
-                    </button>
-                  </div>
-                  
-                  <h3 
-                    onClick={() => setSelectedProduct(prod)}
-                    className="text-base font-semibold text-gray-900 dark:text-white group-hover:text-pink-600 dark:group-hover:text-pink-400 transition-colors cursor-pointer"
-                  >
-                    {prod.nombre}
-                  </h3>
-                  
-                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                    {prod.descripcion}
-                  </p>
-                </div>
-              </div>
-
-              {/* Pie de tarjeta con precios y botones de acción */}
-              <div className="mt-5 pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between gap-2">
-                <div>
-                  <span className="text-[10px] text-gray-400 uppercase tracking-wider block">
-                    {prod.enCamino ? 'Preventa' : 'Precio'}
-                  </span>
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">
-                    ${prod.precio.toFixed(2)}
-                  </span>
-                </div>
-
-                {prod.enCamino ? (
-                  <button
-                    onClick={() => handleAddToCart(prod, 'reserva_en_camino')}
-                    className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md shadow-purple-500/20 hover:opacity-90 active:scale-95 transition-all"
-                  >
-                    Apartar
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleAddToCart(prod, 'compra')}
-                    className="px-3.5 py-2 text-xs font-semibold rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:opacity-90 active:scale-95 transition-all"
-                  >
-                    Comprar
-                  </button>
-                )}
-              </div>
-            </GlassCard>
+            <ProductCard
+              key={prod.id}
+              product={prod}
+              onQuickBuy={handleAddToCart}
+              onOpen={(prod, varianteId) => {
+                const first = varianteId
+                  || (prod.variantes || []).find((item) => prod.enCamino || Number(item.stock) > 0)?.id
+                  || prod.variantes?.[0]?.id
+                  || '';
+                setSelectedProduct(prod);
+                setSelectedVarianteId(first);
+              }}
+            />
           ))}
         </div>
       )}
 
-      {/* MODAL DE DETALLE DE PRODUCTO (REGLA 5 AURORA: MODAL CENTRADO) */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg bg-white/95 dark:bg-[#151518]/95 backdrop-blur-3xl rounded-[2rem] border border-white/50 dark:border-white/10 p-6 sm:p-8 shadow-2xl overflow-hidden apple-scroll max-h-[90vh]">
-            {/* Glow orbe ambiental */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl pointer-events-none" />
+        <ProductDetail
+          product={
+            productos.find((item) => item.id === selectedProduct.id) || selectedProduct
+          }
+          canEditCatalog={canEditCatalog}
+          openProduct={openProduct}
+          varianteId={selectedVarianteId}
+          onVariante={setSelectedVarianteId}
+          onClose={() => {
+            setSelectedProduct(null);
+            setSelectedVarianteId('');
+          }}
+          onAdd={(product, tipo, varianteId) => {
+            handleAddToCart(product, tipo, varianteId);
+            setSelectedProduct(null);
+            setSelectedVarianteId('');
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
-            <button
-              onClick={() => setSelectedProduct(null)}
-              className="absolute top-5 right-5 p-2 rounded-full text-gray-400 hover:text-gray-900 dark:hover:text-white bg-gray-100 dark:bg-white/5 transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+function ProductDetail({ product, canEditCatalog, openProduct, varianteId, onVariante, onClose, onAdd }) {
+  const variante = findVariante(product, varianteId) || product.variantes?.[0];
+  const activeId = variante?.id || varianteId;
+  const agotada = !product.enCamino && stockEstado(product, variante) === 'agotado';
+  const tipo = product.enCamino ? 'reserva_en_camino' : 'compra';
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                {selectedProduct.enCamino ? (
-                  <span className="px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 rounded-full">
-                    Producto en Camino (Preventa)
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-300 rounded-full">
-                    Disponible Inmediato
-                  </span>
-                )}
-                <span className="text-xs text-gray-400 uppercase font-medium">
-                  {selectedProduct.pasillo}
-                </span>
-              </div>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto bg-white p-6 text-neutral-900 shadow-2xl apple-scroll dark:bg-neutral-950 dark:text-white sm:p-8">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 p-2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+          aria-label="Cerrar detalle"
+        >
+          <X className="w-4 h-4" />
+        </button>
 
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                {selectedProduct.nombre}
-              </h2>
+        <ProductVisual
+          seed={product.id}
+          src={product.imagen}
+          variant="hero"
+          fit="contain"
+          className="mb-5 aspect-[5/4] w-full"
+        />
+        {canEditCatalog && (
+          <button
+            type="button"
+            onClick={() => openProduct(product)}
+            className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline"
+          >
+            Editar producto
+          </button>
+        )}
 
-              <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
-                {selectedProduct.descripcion}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+              {product.enCamino ? 'Preventa' : 'Disponible'}
+            </span>
+            <span className="text-xs uppercase tracking-wider text-neutral-400">
+              {[product.marca, ...pasilloLabels(product, pasillos)].filter(Boolean).join(' · ')}
+            </span>
+          </div>
+
+          <h2 className="text-2xl font-medium text-neutral-900 dark:text-white">
+            {product.nombre}
+          </h2>
+
+          <PresentacionPicker product={product} value={activeId} onChange={onVariante} />
+
+          <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
+            {product.descripcion}
+          </p>
+
+          <div className="space-y-1 border border-neutral-200 p-4 dark:border-neutral-800">
+            <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-neutral-700 dark:text-neutral-300">
+              <ShieldCheck className="w-4 h-4" />
+              Activos de la fórmula
+            </span>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              {product.ingredientes || 'Fórmulas de cabina y bienestar seleccionadas por el equipo Milo.'}
+            </p>
+          </div>
+
+          {product.modoUso && (
+            <div className="space-y-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-700 dark:text-neutral-300">
+                Modo de uso
+              </span>
+              <p className="text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+                {product.modoUso}
               </p>
-
-              {/* Ingredientes Activos */}
-              <div className="p-4 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 space-y-1">
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-pink-500" />
-                  Activos de la Fórmula
-                </span>
-                <p className="text-xs text-gray-600 dark:text-gray-400">
-                  {selectedProduct.ingredientes || 'Fórmulas testeadas dermatológicamente sin alérgenos.'}
-                </p>
-              </div>
-
-              {/* Modo de Uso */}
-              {selectedProduct.modoUso && (
-                <div className="space-y-1">
-                  <span className="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                    Modo de Uso Recomendado:
-                  </span>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {selectedProduct.modoUso}
-                  </p>
-                </div>
-              )}
-
-              {/* Información de entrega / preventa */}
-              {selectedProduct.enCamino && (
-                <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-600 dark:text-purple-300 flex items-center gap-2">
-                  <Clock className="w-4 h-4 shrink-0" />
-                  <span>
-                    Arribo estimado a cabina: <strong>{selectedProduct.fechaLlegada}</strong>. Cupos apartados: <strong>{selectedProduct.reservasActuales || 0}/{selectedProduct.cuposReserva || 20}</strong>.
-                  </span>
-                </div>
-              )}
-
-              <div className="pt-4 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
-                <div>
-                  <span className="text-xs text-gray-400 block">Total:</span>
-                  <span className="text-2xl font-bold text-gray-900 dark:text-white">
-                    ${selectedProduct.precio.toFixed(2)} USD
-                  </span>
-                </div>
-
-                <AuroraButton
-                  onClick={() => {
-                    handleAddToCart(selectedProduct, selectedProduct.enCamino ? 'reserva_en_camino' : 'compra');
-                    setSelectedProduct(null);
-                  }}
-                  className="px-6 py-2.5 text-sm font-semibold"
-                >
-                  {selectedProduct.enCamino ? 'Apartar Producto en Preventa' : 'Añadir a la Bolsa'}
-                </AuroraButton>
-              </div>
             </div>
+          )}
+
+          {product.enCamino && (
+            <p className="text-xs text-neutral-600 dark:text-neutral-300">
+              Arribo estimado: <strong>{product.fechaLlegada}</strong>. Cupos: {product.reservasActuales || 0}/{product.cuposReserva || 20}.
+            </p>
+          )}
+
+          <div className="flex items-center justify-between border-t border-neutral-200 pt-4 dark:border-neutral-800">
+            <span className="text-2xl font-medium text-neutral-900 dark:text-white">
+              {formatCOP(variante?.precio ?? product.precio)}
+            </span>
+            <button
+              type="button"
+              disabled={agotada}
+              onClick={() => onAdd(product, tipo, activeId)}
+              className="bg-neutral-900 px-6 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900"
+            >
+              {product.enCamino ? 'Apartar' : agotada ? 'Sin stock' : 'Quick buy'}
+            </button>
           </div>
         </div>
-      )}
-
+      </div>
     </div>
   );
 }

@@ -8,22 +8,21 @@ export default function SkincareDashboard() {
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader 
-        title="Mi Skin-Concierge" 
-        description="Seguimiento de rutina y progreso de tu piel."
-        glow="modelo"
+    <div className="flex flex-col gap-8 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-white">
+      <PageHeader
+        title="Concierge de bienestar"
+        description="Rutina del día: facial, corporal y hábitos de nutrición."
         actions={
-          <button 
+          <button
+            type="button"
             onClick={() => navigate('/mi-burbuja')}
-            className="text-sm font-medium px-4 py-2 bg-white/50 dark:bg-black/20 rounded-lg hover:bg-white dark:hover:bg-black/40 transition-colors shadow-sm"
+            className="border border-neutral-900 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em]"
           >
-            &larr; Volver al Hub
+            Volver
           </button>
         }
       />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-auto sm:h-[450px]">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <RutinaWidget />
         <ProgresoWidget />
       </div>

@@ -1,100 +1,89 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { MiloStore } from '../../services/miloStore';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { MiloStore, esStockGenerico, hasNamedVariantes, stockEstado } from '../../services/miloStore';
+import { formatCOP } from '../../lib/money';
 import { generateWhatsAppUrl, WhatsAppTemplates } from '../../services/whatsappService';
 import PageHeader from '../../components/ui/PageHeader';
-import GlassCard from '../../components/ui/GlassCard';
-import AuroraButton from '../../components/ui/AuroraButton';
+import ProductVisual from '../../components/shop/ProductVisual';
+import { BannerStage } from '../../components/shop/BannerFrame';
 import EquipoTab from './components/EquipoTab';
+import CatalogLists from './components/CatalogLists';
+import InventarioTab from './components/InventarioTab';
 import { useAuth } from '../../context/AuthContext';
+import { useCmsEdit } from '../../context/CmsEditContext';
 import { isGerente } from '../../lib/roles';
-import { 
-  LayoutDashboard, 
-  ShoppingBag, 
-  Image as ImageIcon, 
-  Calendar, 
-  Users, 
-  BookOpen, 
+import { findBannerEstilo, findBannerLayout, findBannerTransicion } from '../../lib/bannerFrames';
+import { pasilloLabels } from '../../lib/pasillos';
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  Image as ImageIcon,
+  Calendar,
+  Users,
+  BookOpen,
   UserCog,
-  Plus, 
-  Edit, 
-  Trash2, 
-  Clock, 
-  MessageCircle, 
-  CheckCircle2, 
-  XCircle, 
-  Save, 
-  X, 
+  Plus,
+  Edit,
+  Trash2,
+  Clock,
+  MessageCircle,
   Search,
-  Sparkles,
   RefreshCw,
-  ExternalLink
+  Sparkles,
+  Package
 } from 'lucide-react';
+
+const tabClass = (active) =>
+  `flex items-center gap-2 whitespace-nowrap px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] ${
+    active ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900' : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+  }`;
+const inputClass = 'w-full border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-900 dark:border-neutral-500 dark:bg-neutral-950 dark:text-white dark:focus:border-white';
+const primaryBtn = 'inline-flex items-center justify-center gap-1.5 bg-neutral-900 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900';
+const panel = 'border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-950';
+const ADMIN_TABS = ['resumen', 'tienda', 'inventario', 'banners', 'cabina', 'citas', 'crm', 'blog', 'equipo'];
+const GERENTE_ONLY_TABS = ['tienda', 'inventario', 'banners', 'cabina', 'blog', 'equipo'];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { profile, loading } = useAuth();
+  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles } = useCmsEdit();
   const gerente = isGerente(profile?.rol);
-  const [activeTab, setActiveTab] = useState('resumen');
+  const requestedTab = searchParams.get('tab') || 'resumen';
+  const activeTab = ADMIN_TABS.includes(requestedTab) ? requestedTab : 'resumen';
 
-  // Estados de datos sincronizados
+  const setActiveTab = (id) => {
+    const next = new URLSearchParams(searchParams);
+    if (!id || id === 'resumen') next.delete('tab');
+    else next.set('tab', id);
+    setSearchParams(next, { replace: true });
+  };
+
   const [productos, setProductos] = useState([]);
-  const [pasillos, setPasillos] = useState([]);
   const [banners, setBanners] = useState([]);
   const [citas, setCitas] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [blogPosts, setBlogPosts] = useState([]);
+  const [servicios, setServicios] = useState([]);
+  const [pasillos, setPasillos] = useState([]);
+  const [marcas, setMarcas] = useState([]);
+  const [etiquetas, setEtiquetas] = useState([]);
+  const [ajustes, setAjustes] = useState(MiloStore.getAjustes());
 
-  // Modales y formularios
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
-  const [productForm, setProductForm] = useState({
-    nombre: '',
-    pasillo: 'skincare',
-    precio: '',
-    stock: '',
-    enCamino: false,
-    fechaLlegada: '',
-    cuposReserva: 20,
-    tag: '',
-    descripcion: '',
-    ingredientes: '',
-    modoUso: ''
-  });
-
-  const [isBannerModalOpen, setIsBannerModalOpen] = useState(false);
-  const [bannerForm, setBannerForm] = useState({
-    tag: '',
-    titulo: '',
-    descripcion: '',
-    botonTexto: 'Agendar Cita',
-    botonEnlace: '/citas',
-    botonSecundarioTexto: 'Ver Tienda',
-    botonSecundarioEnlace: '/tienda',
-    activo: true
-  });
-
-  const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
-  const [blogForm, setBlogForm] = useState({
-    titulo: '',
-    categoria: 'Ciencia Estética',
-    autor: 'Equipo Clínico Milo',
-    tiempoLectura: '4 min',
-    resumen: '',
-    contenido: ''
-  });
-
-  // Filtros de búsqueda
   const [searchClientQuery, setSearchClientQuery] = useState('');
   const [filterCitaEstado, setFilterCitaEstado] = useState('Todas');
 
   const loadAll = () => {
     setProductos(MiloStore.getProductos());
-    setPasillos(MiloStore.getPasillos());
     setBanners(MiloStore.getBanners());
     setCitas(MiloStore.getCitas());
     setClientes(MiloStore.getClientes());
     setBlogPosts(MiloStore.getBlogPosts());
+    setServicios(MiloStore.getServicios());
+    setPasillos(MiloStore.getPasillos());
+    setMarcas(MiloStore.getMarcas());
+    setEtiquetas(MiloStore.getEtiquetas());
+    setAjustes(MiloStore.getAjustes());
   };
 
   useEffect(() => {
@@ -104,75 +93,12 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!gerente && ['tienda', 'banners', 'blog', 'equipo'].includes(activeTab)) {
+    if (loading) return;
+    if (!gerente && GERENTE_ONLY_TABS.includes(activeTab)) {
       setActiveTab('resumen');
     }
-  }, [gerente, activeTab]);
+  }, [loading, gerente, activeTab]);
 
-  // === HANDLERS PRODUCTOS ===
-  const handleOpenProductModal = (prod = null) => {
-    if (prod) {
-      setEditingProduct(prod);
-      setProductForm({ ...prod });
-    } else {
-      setEditingProduct(null);
-      setProductForm({
-        nombre: '',
-        pasillo: 'skincare',
-        precio: '',
-        stock: '10',
-        enCamino: false,
-        fechaLlegada: '',
-        cuposReserva: 20,
-        tag: 'Nuevo',
-        descripcion: '',
-        ingredientes: '',
-        modoUso: ''
-      });
-    }
-    setIsProductModalOpen(true);
-  };
-
-  const handleSaveProduct = (e) => {
-    e.preventDefault();
-    if (editingProduct) {
-      MiloStore.updateProducto(editingProduct.id, {
-        ...productForm,
-        precio: Number(productForm.precio) || 0,
-        stock: Number(productForm.stock) || 0,
-        cuposReserva: Number(productForm.cuposReserva) || 0
-      });
-    } else {
-      MiloStore.addProducto(productForm);
-    }
-    setIsProductModalOpen(false);
-  };
-
-  const handleDeleteProduct = (id) => {
-    if (window.confirm('¿Seguro que deseas eliminar este producto de la tienda?')) {
-      MiloStore.deleteProducto(id);
-    }
-  };
-
-  // === HANDLERS BANNERS ===
-  const handleSaveBanner = (e) => {
-    e.preventDefault();
-    MiloStore.addBanner(bannerForm);
-    setIsBannerModalOpen(false);
-  };
-
-  const handleToggleBanner = (id, currentActive) => {
-    MiloStore.updateBanner(id, { activo: !currentActive });
-  };
-
-  // === HANDLERS BLOG ===
-  const handleSaveBlog = (e) => {
-    e.preventDefault();
-    MiloStore.addBlogPost(blogForm);
-    setIsBlogModalOpen(false);
-  };
-
-  // === HANDLERS CITAS ===
   const handleCitaEstado = (citaId, nuevoEstado) => {
     MiloStore.updateCitaEstado(citaId, nuevoEstado);
   };
@@ -184,8 +110,7 @@ export default function AdminDashboard() {
       fecha: cita.fecha,
       hora: cita.hora
     });
-    const url = generateWhatsAppUrl({ phone: cita.clienteTelefono, message: msg });
-    window.open(url, '_blank');
+    window.open(generateWhatsAppUrl({ phone: cita.clienteTelefono, message: msg }), '_blank');
   };
 
   const sendWhatsAppReminder = (cita) => {
@@ -195,380 +120,375 @@ export default function AdminDashboard() {
       fecha: cita.fecha,
       hora: cita.hora
     });
-    const url = generateWhatsAppUrl({ phone: cita.clienteTelefono, message: msg });
-    window.open(url, '_blank');
+    window.open(generateWhatsAppUrl({ phone: cita.clienteTelefono, message: msg }), '_blank');
   };
 
   const sendWhatsAppCustomerChat = (cliente) => {
-    const msg = `¡Hola ${cliente.nombre}! ✨ Te saludamos desde La Burbuja de Milo. ¿Cómo podemos consentir tu piel hoy?`;
-    const url = generateWhatsAppUrl({ phone: cliente.telefono, message: msg });
-    window.open(url, '_blank');
+    const msg = `Hola ${cliente.nombre}. Te saludamos desde La Burbuja de Milo. ¿Cómo sigue tu protocolo de estética y bienestar?`;
+    window.open(generateWhatsAppUrl({ phone: cliente.telefono, message: msg }), '_blank');
   };
 
-  const filteredCitas = citas.filter(c => {
-    if (filterCitaEstado === 'Todas') return true;
-    return c.estado === filterCitaEstado;
+  const filteredCitas = citas.filter((c) => filterCitaEstado === 'Todas' || c.estado === filterCitaEstado);
+  const filteredClientes = clientes.filter((cl) => {
+    const q = searchClientQuery.toLowerCase();
+    return (
+      cl.nombre.toLowerCase().includes(q) ||
+      cl.telefono.includes(q) ||
+      (cl.email && cl.email.toLowerCase().includes(q)) ||
+      (cl.tipoPiel && cl.tipoPiel.toLowerCase().includes(q))
+    );
   });
 
-  const filteredClientes = clientes.filter(cl => {
-    const q = searchClientQuery.toLowerCase();
-    return cl.nombre.toLowerCase().includes(q) || 
-           cl.telefono.includes(q) || 
-           (cl.email && cl.email.toLowerCase().includes(q)) ||
-           (cl.tipoPiel && cl.tipoPiel.toLowerCase().includes(q));
-  });
+  const tabs = [
+    { id: 'resumen', label: 'Resumen', icon: LayoutDashboard, staff: true },
+    { id: 'tienda', label: `Tienda (${productos.length})`, icon: ShoppingBag, staff: false },
+    { id: 'inventario', label: 'Inventario', icon: Package, staff: false },
+    { id: 'banners', label: `Vitrina (${banners.length})`, icon: ImageIcon, staff: false },
+    { id: 'cabina', label: `Cabina (${servicios.length})`, icon: Sparkles, staff: false },
+    { id: 'citas', label: `Agenda (${citas.length})`, icon: Calendar, staff: true },
+    { id: 'crm', label: `CRM (${clientes.length})`, icon: Users, staff: true },
+    { id: 'blog', label: `Blog (${blogPosts.length})`, icon: BookOpen, staff: false },
+    { id: 'equipo', label: 'Equipo', icon: UserCog, staff: false }
+  ].filter((tab) => gerente || tab.staff);
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Encabezado Maestro */}
-      <PageHeader 
-        title={gerente ? 'Panel Gerente & CRM' : 'Panel Asesor'} 
+    <div className="flex flex-col gap-8 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-white">
+      <PageHeader
+        title={gerente ? 'Panel gerente' : 'Panel asesor'}
         description={gerente
-          ? 'Gestión integral de tienda, equipo, agenda, clientes y blog.'
-          : 'Agenda de citas y seguimiento de clientes.'}
-        glow="admin"
+          ? 'Lo que publiques aquí es lo que ven los clientes: fotos, textos, ficha clínica y cabina.'
+          : 'Agenda, CRM y ficha clínica que se publica en Mi Burbuja.'}
         actions={
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => navigate('/')}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/20 transition-all"
-            >
-              Ver Tienda Pública
+            <button type="button" onClick={() => navigate(gerente ? '/?editar=1' : '/')} className="border border-neutral-900 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] dark:border-white">
+              {gerente ? 'Editar en sitio' : 'Ver sitio'}
             </button>
             <button
+              type="button"
               onClick={() => {
-                if (window.confirm('¿Deseas restablecer los datos de demostración a fábrica?')) {
-                  MiloStore.resetAll();
-                }
+                if (window.confirm('¿Restablecer los datos de demostración?')) MiloStore.resetAll();
               }}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-rose-500 transition-colors"
+              className="p-2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
               title="Restablecer datos de fábrica"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className="h-4 w-4" />
             </button>
           </div>
         }
       />
 
-      {/* TABS DE NAVEGACIÓN ADMINISTRATIVA */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-gray-200/60 dark:border-white/5 apple-scroll">
-        {[
-          { id: 'resumen', label: 'Resumen General', icon: LayoutDashboard, staff: true },
-          { id: 'tienda', label: `Tienda & Pasillos (${productos.length})`, icon: ShoppingBag, staff: false },
-          { id: 'banners', label: `Banners CMS (${banners.length})`, icon: ImageIcon, staff: false },
-          { id: 'citas', label: `Agenda de Citas (${citas.length})`, icon: Calendar, staff: true },
-          { id: 'crm', label: `CRM Clientes (${clientes.length})`, icon: Users, staff: true },
-          { id: 'blog', label: `Blog (${blogPosts.length})`, icon: BookOpen, staff: false },
-          { id: 'equipo', label: 'Cuentas y roles', icon: UserCog, staff: false }
-        ].filter((tab) => gerente || tab.staff).map((tab) => {
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-neutral-200 dark:border-neutral-700 pb-3 apple-scroll dark:border-neutral-700">
+        {tabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
           return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                isActive
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-500/20'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              <span>{tab.label}</span>
+            <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)} className={tabClass(activeTab === tab.id)}>
+              <Icon className="h-4 w-4" />
+              {tab.label}
             </button>
           );
         })}
       </div>
 
-      {/* PESTAÑA 1: RESUMEN GENERAL (DASHBOARD) */}
       {activeTab === 'resumen' && (
         <div className="space-y-6">
-          {/* Métricas clave */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <GlassCard className="p-5 flex flex-col justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Citas Pendientes</span>
-              <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-3xl font-extrabold text-amber-500">
-                  {citas.filter(c => c.estado === 'Pendiente').length}
-                </span>
-                <Calendar className="w-5 h-5 text-amber-500/40" />
-              </div>
-            </GlassCard>
-
-            <GlassCard className="p-5 flex flex-col justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">En Camino / Preventa</span>
-              <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-3xl font-extrabold text-purple-500">
-                  {productos.filter(p => p.enCamino).length}
-                </span>
-                <Clock className="w-5 h-5 text-purple-500/40" />
-              </div>
-            </GlassCard>
-
-            <GlassCard className="p-5 flex flex-col justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Clientes en CRM</span>
-              <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-3xl font-extrabold text-pink-500">
-                  {clientes.length}
-                </span>
-                <Users className="w-5 h-5 text-pink-500/40" />
-              </div>
-            </GlassCard>
-
-            <GlassCard className="p-5 flex flex-col justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Total Productos</span>
-              <div className="mt-2 flex items-baseline justify-between">
-                <span className="text-3xl font-extrabold text-emerald-500">
-                  {productos.length}
-                </span>
-                <ShoppingBag className="w-5 h-5 text-emerald-500/40" />
-              </div>
-            </GlassCard>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {[
+              ['Citas pendientes', citas.filter((c) => c.estado === 'Pendiente').length],
+              ['Preventas en camino', productos.filter((p) => p.enCamino).length],
+              ['Clientes CRM', clientes.length],
+              gerente
+                ? ['Stock bajo', productos.filter((p) => ['agotado', 'bajo'].includes(stockEstado(p))).length]
+                : ['Productos publicados', productos.length]
+            ].map(([label, value]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => {
+                  if (label === 'Stock bajo') setActiveTab('inventario');
+                }}
+                className={`${panel} p-5 text-left`}
+              >
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-400">{label}</span>
+                <p className="mt-2 text-3xl font-medium">{value}</p>
+              </button>
+            ))}
           </div>
-
-          {/* Accesos rápidos e información */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <GlassCard className="p-6 space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/5 pb-3">
-                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-pink-500" />
-                  <span>Próximas Citas por Atender</span>
-                </h3>
-                <button
-                  onClick={() => setActiveTab('citas')}
-                  className="text-xs font-semibold text-pink-600 dark:text-pink-400 hover:underline"
-                >
-                  Ver agenda completa
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className={`${panel} p-6`}>
+              <div className="mb-4 flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 pb-3">
+                <h3 className="text-base font-medium">Próximas citas</h3>
+                <button type="button" onClick={() => setActiveTab('citas')} className="text-xs font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline">
+                  Agenda
                 </button>
               </div>
-
               <div className="space-y-3">
                 {citas.slice(0, 3).map((cita) => (
-                  <div key={cita.id} className="p-3 rounded-xl bg-gray-50 dark:bg-white/5 flex items-center justify-between">
+                  <div key={cita.id} className="flex items-center justify-between border border-neutral-200 dark:border-neutral-700 p-3">
                     <div>
-                      <p className="text-xs font-bold text-gray-900 dark:text-white">{cita.clienteNombre}</p>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400">{cita.servicioTitulo}</p>
-                      <span className="text-[10px] text-pink-600 dark:text-pink-400">{cita.fecha} — {cita.hora}</span>
+                      <p className="text-sm font-medium">{cita.clienteNombre}</p>
+                      <p className="text-xs text-neutral-500">{cita.servicioTitulo}</p>
+                      <p className="text-xs text-neutral-400">{cita.fecha} · {cita.hora}</p>
                     </div>
-                    <button
-                      onClick={() => sendWhatsAppConfirmation(cita)}
-                      className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold flex items-center gap-1"
-                      title="Enviar WhatsApp"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      <span className="hidden sm:inline">WhatsApp</span>
+                    <button type="button" onClick={() => sendWhatsAppConfirmation(cita)} className="p-2 text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
+                      <MessageCircle className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
               </div>
-            </GlassCard>
-
-            <GlassCard className="p-6 space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/5 pb-3">
-                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-purple-500" />
-                  <span>Control de Preventa & En Camino</span>
-                </h3>
-                <button
-                  onClick={() => setActiveTab('tienda')}
-                  className="text-xs font-semibold text-purple-600 dark:text-purple-400 hover:underline"
-                >
-                  Gestionar catálogo
-                </button>
+            </div>
+            <div className={`${panel} p-6`}>
+              <div className="mb-4 flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 pb-3">
+                <h3 className="text-base font-medium">Preventa en camino</h3>
+                {gerente && (
+                  <button type="button" onClick={() => setActiveTab('tienda')} className="text-xs font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline">
+                    Catálogo
+                  </button>
+                )}
               </div>
-
               <div className="space-y-3">
-                {productos.filter(p => p.enCamino).map((prod) => (
-                  <div key={prod.id} className="p-3 rounded-xl bg-purple-500/5 border border-purple-500/10 flex items-center justify-between">
+                {productos.filter((p) => p.enCamino).map((prod) => (
+                  <div key={prod.id} className="flex items-center justify-between border border-neutral-200 dark:border-neutral-700 p-3">
                     <div>
-                      <p className="text-xs font-bold text-gray-900 dark:text-white">{prod.nombre}</p>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400">Arribo: {prod.fechaLlegada || 'Pendiente'}</p>
+                      <p className="text-sm font-medium">{prod.nombre}</p>
+                      <p className="text-xs text-neutral-500">Arribo: {prod.fechaLlegada || 'Pendiente'}</p>
                     </div>
-                    <span className="text-xs font-bold text-purple-600 dark:text-purple-300">
-                      {prod.reservasActuales || 0}/{prod.cuposReserva || 20} apartados
+                    <span className="text-xs text-neutral-500">
+                      {prod.reservasActuales || 0}/{prod.cuposReserva || 20}
                     </span>
                   </div>
                 ))}
               </div>
-            </GlassCard>
+            </div>
           </div>
         </div>
       )}
 
-      {/* PESTAÑA 2: GESTIÓN DE TIENDA Y PASILLOS */}
       {activeTab === 'tienda' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="space-y-8">
+          <CatalogLists pasillos={pasillos} marcas={marcas} etiquetas={etiquetas} store={MiloStore} />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Productos y Pasillos de la Tienda</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Administra el inventario, activa productos en tránsito para preventa y actualiza precios.
-              </p>
+              <h3 className="text-lg font-medium">Productos de la tienda</h3>
+              <p className="text-sm text-neutral-500">La foto, el precio y el modo de uso se publican en la ficha que ven los clientes.</p>
             </div>
-            <AuroraButton
-              onClick={() => handleOpenProductModal()}
-              className="px-4 py-2 text-xs font-semibold flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Nuevo Producto</span>
-            </AuroraButton>
+            <button type="button" onClick={() => handleOpenProductModal()} className={primaryBtn}>
+              <Plus className="h-4 w-4" /> Nuevo producto
+            </button>
           </div>
-
-          {/* Tabla de Productos */}
-          <GlassCard className="p-0 overflow-hidden">
+          <div className={`${panel} overflow-hidden`}>
             <div className="overflow-x-auto apple-scroll">
               <table className="w-full text-left text-xs">
-                <thead className="bg-gray-100/70 dark:bg-white/5 border-b border-gray-200/60 dark:border-white/5 text-gray-600 dark:text-gray-300 uppercase tracking-wider font-semibold">
+                <thead className="border-b border-neutral-200 bg-[#f6f6f6] uppercase tracking-[0.12em] text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
                   <tr>
                     <th className="p-3.5">Producto</th>
                     <th className="p-3.5">Pasillo</th>
                     <th className="p-3.5">Precio</th>
-                    <th className="p-3.5">Estado / Stock</th>
-                    <th className="p-3.5">En Camino</th>
+                    <th className="p-3.5">Stock</th>
+                    <th className="p-3.5">Foto</th>
                     <th className="p-3.5 text-right">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                <tbody className="divide-y divide-neutral-200">
                   {productos.map((prod) => (
-                    <tr key={prod.id} className="hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                    <tr key={prod.id}>
                       <td className="p-3.5">
-                        <p className="font-semibold text-gray-900 dark:text-white">{prod.nombre}</p>
-                        <p className="text-[11px] text-gray-400 truncate max-w-xs">{prod.descripcion}</p>
+                        <p className="font-medium text-neutral-900 dark:text-white">{prod.nombre}</p>
+                        <p className="max-w-xs truncate text-[11px] text-neutral-400">{prod.tag || prod.descripcion}</p>
                       </td>
-                      <td className="p-3.5">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-300">
-                          {prod.pasillo}
-                        </span>
-                      </td>
-                      <td className="p-3.5 font-bold text-gray-900 dark:text-white">
-                        ${prod.precio.toFixed(2)}
+                      <td className="p-3.5 uppercase tracking-[0.12em] text-neutral-500">{pasilloLabels(prod, pasillos).join(' · ') || prod.pasillo}</td>
+                      <td className="p-3.5 font-medium">
+                        {hasNamedVariantes(prod) ? `Desde ${formatCOP(prod.precio)}` : formatCOP(prod.precio)}
                       </td>
                       <td className="p-3.5">
-                        {prod.enCamino ? (
-                          <span className="text-purple-600 dark:text-purple-400 font-semibold text-[11px]">
-                            {prod.reservasActuales || 0}/{prod.cuposReserva || 20} Apartados
-                          </span>
-                        ) : (
-                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
-                            {prod.stock} en cabina
-                          </span>
-                        )}
+                        {prod.enCamino
+                          ? `${prod.reservasActuales || 0}/${prod.cuposReserva || 20} apartados`
+                          : (
+                            <span>
+                              {prod.stock} {esStockGenerico(prod) ? 'genérico' : 'en cabina'}
+                              {hasNamedVariantes(prod) && (
+                                <span className="ml-1 text-[10px] uppercase tracking-[0.12em] text-neutral-400">
+                                  · {(prod.variantes || []).length} pres.
+                                </span>
+                              )}
+                              {esStockGenerico(prod) && (
+                                <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">Pendiente</span>
+                              )}
+                              {stockEstado(prod) === 'agotado' && (
+                                <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-red-700">Agotado</span>
+                              )}
+                              {stockEstado(prod) === 'bajo' && (
+                                <span className="ml-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700">Bajo</span>
+                              )}
+                            </span>
+                          )}
                       </td>
-                      <td className="p-3.5">
-                        {prod.enCamino ? (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300">
-                            Sí ({prod.fechaLlegada})
-                          </span>
-                        ) : (
-                          <span className="text-gray-400 text-[11px]">No (Disponible)</span>
-                        )}
-                      </td>
+                      <td className="p-3.5">{prod.imagen ? 'Publicada' : 'Genérica'}</td>
                       <td className="p-3.5 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleOpenProductModal(prod)}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-                            title="Editar"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProduct(prod.id)}
-                            className="p-1.5 rounded-lg text-gray-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                            title="Eliminar"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <button type="button" onClick={() => handleOpenProductModal(prod)} className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.confirm('¿Eliminar este producto de la tienda?') && MiloStore.deleteProducto(prod.id)}
+                          className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </GlassCard>
+          </div>
         </div>
       )}
 
-      {/* PESTAÑA 3: BANNERS CMS */}
       {activeTab === 'banners' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="space-y-6">
+          <div className={`${panel} space-y-4 p-6`}>
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Banners y Portada de la Tienda</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Personaliza los anuncios promocionales del Hero y campañas vigentes.
-              </p>
+              <h3 className="text-lg font-medium">Barra promocional</h3>
+              <p className="text-sm text-neutral-500">Texto gris del encabezado que ven todos los clientes.</p>
             </div>
-            <AuroraButton
-              onClick={() => setIsBannerModalOpen(true)}
-              className="px-4 py-2 text-xs font-semibold flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Nuevo Banner</span>
-            </AuroraButton>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={ajustes.promoActivo !== false}
+                onChange={(e) => MiloStore.saveAjustes({ ...ajustes, promoActivo: e.target.checked })}
+              />
+              Mostrar barra
+            </label>
+            <input
+              type="text"
+              value={ajustes.promoTexto || ''}
+              onChange={(e) => MiloStore.saveAjustes({ ...ajustes, promoTexto: e.target.value })}
+              className={inputClass}
+            />
+            {(ajustes.newsletterEmails || []).length > 0 && (
+              <p className="text-xs text-neutral-500">
+                Newsletter: {(ajustes.newsletterEmails || []).length} correos inscritos desde Inicio.
+              </p>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className={`${panel} space-y-3 p-6`}>
+            <div>
+              <h3 className="text-lg font-medium">Círculos de Inicio</h3>
+              <p className="text-sm text-neutral-500">Fotos, recorte, orden y centrado de Facial, Corporal, Bienestar, Cabina, Capilar y Marcas.</p>
+            </div>
+            <button type="button" onClick={openCategoryCircles} className={primaryBtn}>
+              Editar círculos
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium">Banners de Inicio</h3>
+              <p className="text-sm text-neutral-500">Título, botones y fotografía del hero que recorre el cliente.</p>
+            </div>
+            <button type="button" onClick={() => handleOpenBannerModal()} className={primaryBtn}>
+              <Plus className="h-4 w-4" /> Nuevo banner
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {banners.map((b) => (
-              <GlassCard key={b.id} className="p-5 flex flex-col justify-between space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-pink-100 dark:bg-pink-900/40 text-pink-600 dark:text-pink-300">
-                      {b.tag || 'Banner Hero'}
-                    </span>
+              <article key={b.id} className={panel}>
+                <div className="relative h-36 w-full overflow-hidden">
+                  <BannerStage key={b.id} banner={b} className="absolute inset-0" />
+                </div>
+                <div className="space-y-3 p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{b.tag || 'Hero'}</span>
                     <button
-                      onClick={() => handleToggleBanner(b.id, b.activo)}
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        b.activo
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                          : 'bg-gray-200 text-gray-500 dark:bg-white/10 dark:text-gray-400'
-                      }`}
+                      type="button"
+                      onClick={() => MiloStore.updateBanner(b.id, { activo: !b.activo })}
+                      className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${b.activo ? 'bg-neutral-900 px-2 py-0.5 text-white' : 'text-neutral-400'}`}
                     >
-                      {b.activo ? 'Activo' : 'Inactivo'}
+                      {b.activo ? 'Activo' : 'Oculto'}
                     </button>
                   </div>
-
-                  <h4 className="text-base font-bold text-gray-900 dark:text-white">{b.titulo}</h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{b.descripcion}</p>
+                  <h4 className="text-base font-medium">{b.titulo}</h4>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-400">
+                    {findBannerLayout(b.marcoLayout).label}
+                    {b.marcoEstilo && b.marcoEstilo !== 'lleno' ? ` · ${findBannerEstilo(b.marcoEstilo).label}` : ''}
+                    {b.transicion && b.transicion !== 'fundido' ? ` · ${findBannerTransicion(b.transicion).label}` : ''}
+                  </p>
+                  <p className="line-clamp-2 text-sm text-neutral-500">{b.descripcion}</p>
+                  <p className="text-[11px] text-neutral-400">{b.botonTexto} → {b.botonEnlace}</p>
+                  <div className="flex justify-end gap-1 border-t border-neutral-200 pt-3">
+                    <button type="button" onClick={() => handleOpenBannerModal(b)} className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => window.confirm('¿Eliminar este banner?') && MiloStore.deleteBanner(b.id)}
+                      className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-
-                <div className="pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between text-xs">
-                  <span className="text-gray-400">Botón: <strong>{b.botonTexto}</strong> ({b.botonEnlace})</span>
-                  <button
-                    onClick={() => MiloStore.deleteBanner(b.id)}
-                    className="p-1 text-gray-400 hover:text-rose-500 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </GlassCard>
+              </article>
             ))}
           </div>
         </div>
       )}
 
-      {/* PESTAÑA 4: AGENDA DE CITAS & RESERVAS */}
+      {activeTab === 'cabina' && (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-lg font-medium">Servicios de cabina</h3>
+              <p className="text-sm text-neutral-500">Estos tratamientos y su foto aparecen en Cabina y en los featured picks de Inicio.</p>
+            </div>
+            <button type="button" onClick={() => handleOpenServicioModal()} className={primaryBtn}>
+              <Plus className="h-4 w-4" /> Nuevo servicio
+            </button>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {servicios.map((srv) => (
+              <article key={srv.id} className={panel}>
+                <ProductVisual seed={srv.id} src={srv.imagen} className="h-32 w-full" />
+                <div className="space-y-2 p-5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{srv.categoria}</p>
+                  <h4 className="text-base font-medium">{srv.titulo}</h4>
+                  <p className="line-clamp-2 text-sm text-neutral-500">{srv.descripcion}</p>
+                  <p className="text-xs text-neutral-400">{srv.duracionMinutos} min · {formatCOP(srv.precio)}</p>
+                  <div className="flex justify-end gap-1 border-t border-neutral-200 pt-3">
+                    <button type="button" onClick={() => handleOpenServicioModal(srv)} className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => window.confirm('¿Eliminar este servicio de cabina?') && MiloStore.deleteServicio(srv.id)}
+                      className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'citas' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Agenda de Valoraciones y Tratamientos</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Gestiona citas, aprueba horarios y envía confirmaciones automáticas por WhatsApp.
-              </p>
+              <h3 className="text-lg font-medium">Agenda</h3>
+              <p className="text-sm text-neutral-500">Las citas que confirmas aquí aparecen en Mi Burbuja del cliente.</p>
             </div>
-
-            {/* Filtro de estado de cita */}
-            <div className="flex items-center gap-1.5 p-1 bg-gray-100 dark:bg-white/5 rounded-xl">
+            <div className="flex flex-wrap gap-1">
               {['Todas', 'Pendiente', 'Confirmada', 'Realizada', 'Cancelada'].map((est) => (
                 <button
                   key={est}
+                  type="button"
                   onClick={() => setFilterCitaEstado(est)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    filterCitaEstado === est
-                      ? 'bg-white dark:bg-white/20 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+                  className={`px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${
+                    filterCitaEstado === est ? 'bg-neutral-900 text-white' : 'border border-neutral-200 dark:border-neutral-700 text-neutral-500'
                   }`}
                 >
                   {est}
@@ -576,508 +496,151 @@ export default function AdminDashboard() {
               ))}
             </div>
           </div>
-
-          <GlassCard className="p-0 overflow-hidden">
+          <div className={`${panel} overflow-hidden`}>
             <div className="overflow-x-auto apple-scroll">
               <table className="w-full text-left text-xs">
-                <thead className="bg-gray-100/70 dark:bg-white/5 border-b border-gray-200/60 dark:border-white/5 text-gray-600 dark:text-gray-300 uppercase tracking-wider font-semibold">
+                <thead className="border-b border-neutral-200 bg-[#f6f6f6] uppercase tracking-[0.12em] text-neutral-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400">
                   <tr>
                     <th className="p-3.5">Cliente</th>
-                    <th className="p-3.5">Tratamiento / Servicio</th>
-                    <th className="p-3.5">Fecha y Hora</th>
+                    <th className="p-3.5">Servicio</th>
+                    <th className="p-3.5">Fecha</th>
                     <th className="p-3.5">Estado</th>
-                    <th className="p-3.5">Notas del Cliente</th>
-                    <th className="p-3.5 text-right">Acciones WhatsApp / Estado</th>
+                    <th className="p-3.5">Notas</th>
+                    <th className="p-3.5 text-right">WhatsApp</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-white/5">
+                <tbody className="divide-y divide-neutral-200">
                   {filteredCitas.map((cita) => (
-                    <tr key={cita.id} className="hover:bg-gray-50/50 dark:hover:bg-white/[0.02] transition-colors">
+                    <tr key={cita.id}>
                       <td className="p-3.5">
-                        <p className="font-semibold text-gray-900 dark:text-white">{cita.clienteNombre}</p>
-                        <p className="text-[11px] text-gray-400">{cita.clienteTelefono}</p>
+                        <p className="font-medium">{cita.clienteNombre}</p>
+                        <p className="text-[11px] text-neutral-400">{cita.clienteTelefono}</p>
                       </td>
                       <td className="p-3.5">
-                        <p className="font-medium text-gray-900 dark:text-white">{cita.servicioTitulo}</p>
-                        <span className="text-[10px] text-gray-400">{cita.duracionMinutos || 60} min</span>
+                        <p>{cita.servicioTitulo}</p>
+                        <span className="text-[10px] text-neutral-400">{cita.duracionMinutos || 60} min</span>
                       </td>
-                      <td className="p-3.5">
-                        <span className="font-semibold text-pink-600 dark:text-pink-400">{cita.fecha}</span>
-                        <p className="text-[11px] text-gray-400">{cita.hora}</p>
-                      </td>
+                      <td className="p-3.5">{cita.fecha} · {cita.hora}</td>
                       <td className="p-3.5">
                         <select
                           value={cita.estado}
                           onChange={(e) => handleCitaEstado(cita.id, e.target.value)}
-                          className={`px-2 py-1 rounded-lg text-xs font-bold border-none bg-transparent cursor-pointer ${
-                            cita.estado === 'Confirmada'
-                              ? 'text-emerald-600 dark:text-emerald-400'
-                              : cita.estado === 'Pendiente'
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : cita.estado === 'Realizada'
-                              ? 'text-blue-600 dark:text-blue-400'
-                              : 'text-rose-600 dark:text-rose-400'
-                          }`}
+                          className="border border-neutral-300 bg-white px-2 py-1 text-xs dark:border-neutral-500 dark:bg-neutral-950 dark:text-white"
                         >
-                          <option value="Pendiente" className="text-gray-900 dark:text-black">Pendiente</option>
-                          <option value="Confirmada" className="text-gray-900 dark:text-black">Confirmada</option>
-                          <option value="Realizada" className="text-gray-900 dark:text-black">Realizada</option>
-                          <option value="Cancelada" className="text-gray-900 dark:text-black">Cancelada</option>
+                          <option value="Pendiente">Pendiente</option>
+                          <option value="Confirmada">Confirmada</option>
+                          <option value="Realizada">Realizada</option>
+                          <option value="Cancelada">Cancelada</option>
                         </select>
                       </td>
-                      <td className="p-3.5 text-gray-500 max-w-xs truncate">
-                        {cita.notasCliente || 'Sin notas especiales'}
-                      </td>
+                      <td className="max-w-xs truncate p-3.5 text-neutral-500">{cita.notasCliente || '—'}</td>
                       <td className="p-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => sendWhatsAppConfirmation(cita)}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-[11px] font-semibold flex items-center gap-1"
-                            title="Confirmar por WhatsApp"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5" />
-                            <span>Confirmar</span>
-                          </button>
-                          <button
-                            onClick={() => sendWhatsAppReminder(cita)}
-                            className="px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 text-[11px] font-semibold flex items-center gap-1"
-                            title="Recordatorio por WhatsApp"
-                          >
-                            <Clock className="w-3.5 h-3.5" />
-                            <span>Recordar</span>
-                          </button>
-                        </div>
+                        <button type="button" onClick={() => sendWhatsAppConfirmation(cita)} className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
+                          <MessageCircle className="h-4 w-4" />
+                        </button>
+                        <button type="button" onClick={() => sendWhatsAppReminder(cita)} className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
+                          <Clock className="h-4 w-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </GlassCard>
+          </div>
         </div>
       )}
 
-      {/* PESTAÑA 5: CRM & CLIENTES */}
       {activeTab === 'crm' && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Directorio CRM & Ficha de Clientes</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Historial de visitas, notas de diagnóstico estético y comunicación directa.
-              </p>
+              <h3 className="text-lg font-medium">Ficha CRM</h3>
+              <p className="text-sm text-neutral-500">Diagnóstico y activos se publican en la ficha clínica de Mi Burbuja.</p>
             </div>
-
-            {/* Buscador de cliente */}
             <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
               <input
                 type="text"
-                placeholder="Buscar por nombre o teléfono..."
+                placeholder="Buscar cliente"
                 value={searchClientQuery}
                 onChange={(e) => setSearchClientQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
+                className={`${inputClass} pl-9`}
               />
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredClientes.map((cl) => (
-              <GlassCard key={cl.id} className="p-5 flex flex-col justify-between space-y-4">
+              <article key={cl.id} className={`${panel} flex flex-col justify-between p-5`}>
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400">
-                      {cl.ciudad || 'Cliente Registrado'}
-                    </span>
-                    <span className="text-[10px] text-gray-400">
-                      {cl.citasCount || 0} Citas • {cl.pedidosCount || 0} Pedidos
-                    </span>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
+                    {cl.ciudad || 'Cliente'} · {cl.citasCount || 0} citas
+                  </p>
+                  <h4 className="mt-2 text-base font-medium">{cl.nombre}</h4>
+                  <p className="text-xs text-neutral-500">{cl.telefono}{cl.email ? ` · ${cl.email}` : ''}</p>
+                  <div className="mt-3 border border-neutral-200 dark:border-neutral-700 p-3 text-xs">
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">Diagnóstico publicado</span>
+                    <p className="mt-1 font-medium">{cl.diagnostico || cl.tipoPiel || 'Por evaluar'}</p>
                   </div>
-
-                  <h4 className="text-base font-bold text-gray-900 dark:text-white">{cl.nombre}</h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{cl.telefono} {cl.email ? `• ${cl.email}` : ''}</p>
-
-                  <div className="mt-3 p-3 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 space-y-1 text-xs">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">Tipo de Piel</span>
-                    <p className="font-medium text-gray-800 dark:text-gray-200">{cl.tipoPiel || 'Por evaluar'}</p>
-                  </div>
-
-                  {cl.notasCRM && (
-                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
-                      "{cl.notasCRM}"
-                    </div>
-                  )}
                 </div>
-
-                <div className="pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
-                  <button
-                    onClick={() => sendWhatsAppCustomerChat(cl)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition-colors"
-                  >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>WhatsApp</span>
+                <div className="mt-4 flex items-center justify-between border-t border-neutral-200 pt-3">
+                  <button type="button" onClick={() => sendWhatsAppCustomerChat(cl)} className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em]">
+                    <MessageCircle className="h-4 w-4" /> WhatsApp
                   </button>
-
-                  {cl.reservasActivas > 0 && (
-                    <span className="text-[10px] font-bold text-purple-600 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/40 px-2 py-0.5 rounded">
-                      {cl.reservasActivas} Reserva en camino
-                    </span>
-                  )}
+                  <button type="button" onClick={() => handleOpenFicha(cl)} className="text-xs font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline">
+                    Editar ficha
+                  </button>
                 </div>
-              </GlassCard>
+              </article>
             ))}
           </div>
         </div>
       )}
 
-      {/* PESTAÑA 6: BLOG CMS */}
       {activeTab === 'blog' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Publicaciones del Blog</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Crea contenido educativo sobre fórmulas, desmitificación de activos y rutinas conscientes.
-              </p>
+              <h3 className="text-lg font-medium">Artículos del blog</h3>
+              <p className="text-sm text-neutral-500">Portada y texto se publican en Blog y en el bloque editorial de Inicio.</p>
             </div>
-            <AuroraButton
-              onClick={() => setIsBlogModalOpen(true)}
-              className="px-4 py-2 text-xs font-semibold flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Nuevo Artículo</span>
-            </AuroraButton>
+            <button type="button" onClick={() => handleOpenBlogModal()} className={primaryBtn}>
+              <Plus className="h-4 w-4" /> Nuevo artículo
+            </button>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {blogPosts.map((post) => (
-              <GlassCard key={post.id} className="p-5 flex flex-col justify-between space-y-3">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-pink-600 dark:text-pink-400">
-                    {post.categoria}
-                  </span>
-                  <h4 className="text-sm font-bold text-gray-900 dark:text-white mt-1">{post.titulo}</h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3 mt-1">{post.resumen}</p>
+              <article key={post.id} className={panel}>
+                <ProductVisual seed={post.id} src={post.imagen} className="h-32 w-full" />
+                <div className="space-y-2 p-5">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{post.categoria}</span>
+                  <h4 className="text-sm font-medium">{post.titulo}</h4>
+                  <p className="line-clamp-3 text-xs text-neutral-500">{post.resumen}</p>
+                  <div className="flex items-center justify-between border-t border-neutral-200 pt-3 text-xs text-neutral-400">
+                    <span>{post.fecha}</span>
+                    <div>
+                      <button type="button" onClick={() => handleOpenBlogModal(post)} className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => window.confirm('¿Eliminar este artículo?') && MiloStore.deleteBlogPost(post.id)}
+                        className="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between text-xs">
-                  <span className="text-gray-400">{post.fecha}</span>
-                  <button
-                    onClick={() => MiloStore.deleteBlogPost(post.id)}
-                    className="p-1 text-gray-400 hover:text-rose-500 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </GlassCard>
+              </article>
             ))}
           </div>
         </div>
       )}
 
+      {activeTab === 'inventario' && gerente && <InventarioTab />}
+
       {activeTab === 'equipo' && gerente && <EquipoTab />}
-
-      {/* MODAL CREAR/EDITAR PRODUCTO */}
-      {isProductModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-lg bg-white/95 dark:bg-[#151518]/95 backdrop-blur-3xl rounded-[2rem] border border-white/50 dark:border-white/10 p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto apple-scroll">
-            <button
-              onClick={() => setIsProductModalOpen(false)}
-              className="absolute top-5 right-5 p-2 rounded-full text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-              {editingProduct ? 'Editar Producto' : 'Nuevo Producto para la Tienda'}
-            </h3>
-
-            <form onSubmit={handleSaveProduct} className="space-y-4 text-xs">
-              <div className="space-y-1">
-                <label className="font-bold uppercase text-gray-700 dark:text-gray-300">Nombre del Producto *</label>
-                <input
-                  type="text"
-                  required
-                  value={productForm.nombre}
-                  onChange={(e) => setProductForm({ ...productForm, nombre: e.target.value })}
-                  placeholder="ej. Serum Reparador Centella 50ml"
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="font-bold uppercase text-gray-700 dark:text-gray-300">Pasillo de la Tienda</label>
-                  <select
-                    value={productForm.pasillo}
-                    onChange={(e) => setProductForm({ ...productForm, pasillo: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm text-gray-900 dark:text-white focus:outline-none"
-                  >
-                    <option value="skincare">Skincare Facial</option>
-                    <option value="capilar">Cuidado Capilar</option>
-                    <option value="tratamientos">Tratamientos & Cabina</option>
-                    <option value="nutricosmetica">Nutricosmética</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="font-bold uppercase text-gray-700 dark:text-gray-300">Precio (USD) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={productForm.precio}
-                    onChange={(e) => setProductForm({ ...productForm, precio: e.target.value })}
-                    placeholder="35.00"
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-sm text-gray-900 dark:text-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Interruptor Producto en Camino (Preventa) */}
-              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-3">
-                <label className="flex items-center gap-2 cursor-pointer font-bold text-purple-700 dark:text-purple-300">
-                  <input
-                    type="checkbox"
-                    checked={productForm.enCamino}
-                    onChange={(e) => setProductForm({ ...productForm, enCamino: e.target.checked })}
-                    className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500"
-                  />
-                  <span>¿Producto en camino? (Habilitar reservas de preventa)</span>
-                </label>
-
-                {productForm.enCamino && (
-                  <div className="grid grid-cols-2 gap-3 pt-2">
-                    <div>
-                      <label className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Fecha Estimada Arribo</label>
-                      <input
-                        type="date"
-                        value={productForm.fechaLlegada}
-                        onChange={(e) => setProductForm({ ...productForm, fechaLlegada: e.target.value })}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-black/40 border border-purple-300 dark:border-purple-500/30 text-xs text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Cupos de Reserva</label>
-                      <input
-                        type="number"
-                        value={productForm.cuposReserva}
-                        onChange={(e) => setProductForm({ ...productForm, cuposReserva: e.target.value })}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-black/40 border border-purple-300 dark:border-purple-500/30 text-xs text-gray-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold uppercase text-gray-700 dark:text-gray-300">Descripción del Producto</label>
-                <textarea
-                  rows={2}
-                  value={productForm.descripcion}
-                  onChange={(e) => setProductForm({ ...productForm, descripcion: e.target.value })}
-                  placeholder="Beneficios y propiedades principales..."
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white focus:outline-none"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="font-bold uppercase text-gray-700 dark:text-gray-300">Ingredientes y Activos</label>
-                <input
-                  type="text"
-                  value={productForm.ingredientes}
-                  onChange={(e) => setProductForm({ ...productForm, ingredientes: e.target.value })}
-                  placeholder="ej. Madecassoside 72%, Pantenol, Ácido Hialurónico"
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsProductModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                >
-                  Cancelar
-                </button>
-                <AuroraButton type="submit" className="px-6 py-2 font-semibold">
-                  Guardar en Tienda
-                </AuroraButton>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL CREAR BANNER */}
-      {isBannerModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="relative w-full max-w-md bg-white/95 dark:bg-[#151518]/95 backdrop-blur-3xl rounded-[2rem] border border-white/50 dark:border-white/10 p-6 shadow-2xl">
-            <button
-              onClick={() => setIsBannerModalOpen(false)}
-              className="absolute top-5 right-5 p-2 rounded-full text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Nuevo Banner Promocional</h3>
-
-            <form onSubmit={handleSaveBanner} className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold uppercase text-gray-600 dark:text-gray-300">Etiqueta Superior</label>
-                <input
-                  type="text"
-                  placeholder="ej. NUEVA COLECCIÓN BOTÁNICA"
-                  value={bannerForm.tag}
-                  onChange={(e) => setBannerForm({ ...bannerForm, tag: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold uppercase text-gray-600 dark:text-gray-300">Título Principal *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ej. Fórmulas Puras para Piel Radiante"
-                  value={bannerForm.titulo}
-                  onChange={(e) => setBannerForm({ ...bannerForm, titulo: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold uppercase text-gray-600 dark:text-gray-300">Descripción</label>
-                <textarea
-                  rows={2}
-                  value={bannerForm.descripcion}
-                  onChange={(e) => setBannerForm({ ...bannerForm, descripcion: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="font-bold text-gray-600 dark:text-gray-300">Texto Botón</label>
-                  <input
-                    type="text"
-                    value={bannerForm.botonTexto}
-                    onChange={(e) => setBannerForm({ ...bannerForm, botonTexto: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-gray-600 dark:text-gray-300">Enlace Destino</label>
-                  <input
-                    type="text"
-                    value={bannerForm.botonEnlace}
-                    onChange={(e) => setBannerForm({ ...bannerForm, botonEnlace: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsBannerModalOpen(false)}
-                  className="px-3 py-1.5 text-gray-500"
-                >
-                  Cancelar
-                </button>
-                <AuroraButton type="submit" className="px-5 py-1.5 font-semibold">
-                  Guardar Banner
-                </AuroraButton>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL CREAR ARTÍCULO BLOG */}
-      {isBlogModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
-          <div className="relative w-full max-w-lg bg-white/95 dark:bg-[#151518]/95 backdrop-blur-3xl rounded-[2rem] border border-white/50 dark:border-white/10 p-6 shadow-2xl max-h-[90vh] overflow-y-auto apple-scroll">
-            <button
-              onClick={() => setIsBlogModalOpen(false)}
-              className="absolute top-5 right-5 p-2 rounded-full text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3">Nuevo Artículo para el Blog</h3>
-
-            <form onSubmit={handleSaveBlog} className="space-y-3 text-xs">
-              <div>
-                <label className="font-bold uppercase text-gray-600 dark:text-gray-300">Título del Post *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="ej. El Poder de los Péptidos en la Regeneración Celular"
-                  value={blogForm.titulo}
-                  onChange={(e) => setBlogForm({ ...blogForm, titulo: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="font-bold text-gray-600 dark:text-gray-300">Categoría</label>
-                  <input
-                    type="text"
-                    value={blogForm.categoria}
-                    onChange={(e) => setBlogForm({ ...blogForm, categoria: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-gray-600 dark:text-gray-300">Autor</label>
-                  <input
-                    type="text"
-                    value={blogForm.autor}
-                    onChange={(e) => setBlogForm({ ...blogForm, autor: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-bold uppercase text-gray-600 dark:text-gray-300">Resumen Breve</label>
-                <textarea
-                  rows={2}
-                  value={blogForm.resumen}
-                  onChange={(e) => setBlogForm({ ...blogForm, resumen: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white"
-                />
-              </div>
-
-              <div>
-                <label className="font-bold uppercase text-gray-600 dark:text-gray-300">Contenido Completo</label>
-                <textarea
-                  rows={6}
-                  value={blogForm.contenido}
-                  onChange={(e) => setBlogForm({ ...blogForm, contenido: e.target.value })}
-                  placeholder="Escribe el cuerpo del artículo..."
-                  className="w-full px-3 py-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-xs text-gray-900 dark:text-white apple-scroll"
-                />
-              </div>
-
-              <div className="pt-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsBlogModalOpen(false)}
-                  className="px-3 py-1.5 text-gray-500"
-                >
-                  Cancelar
-                </button>
-                <AuroraButton type="submit" className="px-5 py-1.5 font-semibold">
-                  Publicar Artículo
-                </AuroraButton>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

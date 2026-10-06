@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MiloStore } from '../../services/miloStore';
+import { formatCOP } from '../../lib/money';
 import { X, ShoppingBag, Trash2, ArrowRight, Sparkles, CheckCircle2, Clock } from 'lucide-react';
 import AuroraButton from '../ui/AuroraButton';
 
@@ -56,7 +57,7 @@ export default function CartDrawer({ isOpen, onClose }) {
       ]);
     }
 
-    MiloStore.clearCarrito();
+    MiloStore.checkoutCarrito();
     setIsSuccess(true);
     setTimeout(() => {
       setIsSuccess(false);
@@ -126,7 +127,7 @@ export default function CartDrawer({ isOpen, onClose }) {
               {/* Lista de productos */}
               <div className="divide-y divide-gray-100 dark:divide-white/5">
                 {items.map((item) => (
-                  <div key={`${item.id}-${item.tipo}`} className="py-3 flex items-center justify-between gap-3">
+                  <div key={`${item.id}-${item.tipo}-${item.varianteId || 'std'}`} className="py-3 flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
                         {item.tipo === 'reserva_en_camino' ? (
@@ -143,17 +144,20 @@ export default function CartDrawer({ isOpen, onClose }) {
                         )}
                       </div>
                       <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.nombre}</h4>
+                      {item.presentacion ? (
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">{item.presentacion}</p>
+                      ) : null}
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        ${item.precio.toFixed(2)} x {item.cantidad}
+                        {formatCOP(item.precio)} x {item.cantidad}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-bold text-gray-900 dark:text-white">
-                        ${(item.precio * item.cantidad).toFixed(2)}
+                        {formatCOP(item.precio * item.cantidad)}
                       </span>
                       <button
-                        onClick={() => MiloStore.removeFromCarrito(item.id, item.tipo)}
+                        onClick={() => MiloStore.removeFromCarrito(item.id, item.tipo, item.varianteId)}
                         className="p-1 text-gray-400 hover:text-rose-500 transition-colors"
                         title="Eliminar"
                       >
@@ -188,7 +192,7 @@ export default function CartDrawer({ isOpen, onClose }) {
 
                 <div className="pt-2 flex items-center justify-between">
                   <span className="text-sm text-gray-500 dark:text-gray-400">Total a Pagar / Apartar:</span>
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">${total.toFixed(2)} USD</span>
+                  <span className="text-lg font-bold text-gray-900 dark:text-white">{formatCOP(total)}</span>
                 </div>
 
                 <AuroraButton type="submit" className="w-full py-2.5 text-sm font-semibold mt-2">

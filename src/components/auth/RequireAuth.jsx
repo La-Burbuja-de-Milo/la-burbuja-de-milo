@@ -11,9 +11,9 @@ export default function RequireAuth({ children, staffOnly = false, gerenteOnly =
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (loading) {
+  if (loading && !profile) {
     return (
-      <div className="py-16 text-center text-sm text-gray-500">
+      <div className="py-16 text-center text-sm text-neutral-500">
         Cargando sesión...
       </div>
     );

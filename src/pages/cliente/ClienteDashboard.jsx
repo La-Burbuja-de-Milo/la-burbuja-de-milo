@@ -1,23 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MiloStore } from '../../services/miloStore';
 import { generateGoogleCalendarUrl } from '../../services/calendarService';
 import PageHeader from '../../components/ui/PageHeader';
-import GlassCard from '../../components/ui/GlassCard';
-import AuroraButton from '../../components/ui/AuroraButton';
-import { Calendar, Clock, ShoppingBag, Sparkles, CheckCircle, CalendarPlus, UserCheck, Droplets, AlertCircle } from 'lucide-react';
+import ProductCard from '../../components/shop/ProductCard';
+import { useAuth } from '../../context/AuthContext';
+import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
+import { Calendar, Clock, UserCheck, CalendarPlus } from 'lucide-react';
+
+const tabClass = (active) =>
+  `flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] sm:text-[13px] ${
+    active ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900' : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+  }`;
+
+const statusClass = (estado) => {
+  if (estado === 'Confirmada') return 'bg-neutral-900 text-white';
+  if (estado === 'Pendiente') return 'border border-neutral-900 text-neutral-900 dark:border-white dark:text-white';
+  if (estado === 'Realizada') return 'bg-neutral-200 text-neutral-700';
+  return 'bg-neutral-100 text-neutral-500';
+};
 
 export default function ClienteDashboard() {
   const navigate = useNavigate();
+  const { session, profile } = useAuth();
+  const { canEditFicha } = useVisualEdit();
+  const { openFicha } = useCmsEdit();
   const [citas, setCitas] = useState([]);
   const [productosEnCamino, setProductosEnCamino] = useState([]);
-  const [activeTab, setActiveTab] = useState('citas'); // 'citas' | 'reservas' | 'perfil'
+  const [clientes, setClientes] = useState([]);
+  const [activeTab, setActiveTab] = useState('citas');
+  const [notice, setNotice] = useState('');
 
   const loadData = () => {
     setCitas(MiloStore.getCitas());
-    // Productos en camino que se pueden reservar
-    const allProds = MiloStore.getProductos();
-    setProductosEnCamino(allProds.filter(p => p.enCamino));
+    setProductosEnCamino(MiloStore.getProductos().filter((p) => p.enCamino));
+    setClientes(MiloStore.getClientes());
   };
 
   useEffect(() => {
@@ -26,74 +43,102 @@ export default function ClienteDashboard() {
     return () => window.removeEventListener('milo_store_updated', loadData);
   }, []);
 
+  const ficha = useMemo(() => {
+    const email = (session?.user?.email || profile?.email || '').toLowerCase();
+    const telefono = profile?.telefono || '';
+    return clientes.find((cl) =>
+      (email && cl.email?.toLowerCase() === email) ||
+      (telefono && cl.telefono === telefono)
+    ) || null;
+  }, [clientes, session?.user?.email, profile?.email, profile?.telefono]);
+
+  const fichaCampos = [
+    ['Diagnóstico', ficha?.diagnostico || ficha?.tipoPiel || 'Pendiente de valoración en cabina'],
+    ['Activos recomendados', ficha?.activosRecomendados || 'Se asignan tras tu primera valoración'],
+    ['Próxima sesión', ficha?.proximaSesion || 'Por agendar'],
+    ['Concierge Milo', ficha?.skinConcierge || 'Equipo Milo'],
+  ];
+
+  const handleQuickBuy = (producto, tipo) => {
+    const added = MiloStore.addToCarrito(producto, tipo);
+    setNotice(added ? `${producto.nombre} se añadió a tu bolsa` : `No hay stock de ${producto.nombre}`);
+    window.setTimeout(() => setNotice(''), 2500);
+  };
+
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader 
-        title="Mi Burbuja" 
-        description="Tu santuario personal: Consulta tus citas agendadas, recordatorios y productos reservados."
-        glow="default"
+    <div className="flex flex-col gap-8 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-white">
+      {notice && (
+        <div className="fixed bottom-6 right-6 z-50 bg-neutral-900 px-4 py-2.5 text-xs font-medium text-white">
+          {notice}
+        </div>
+      )}
+
+      <PageHeader
+        title="Mi Burbuja"
+        description="Citas, preventas y tu ficha clínica de estética y bienestar."
         actions={
           <button
+            type="button"
             onClick={() => navigate('/citas')}
-            className="px-4 py-2 text-xs font-semibold rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-md shadow-pink-500/20 active:scale-95 transition-all"
+            className="bg-neutral-900 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white"
           >
-            + Nueva Cita
+            Nueva cita
           </button>
         }
       />
 
-      {/* Selector de Pestañas del Cliente */}
-      <div className="flex items-center gap-2 border-b border-gray-200/60 dark:border-white/5 pb-2">
-        <button
-          onClick={() => setActiveTab('citas')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-            activeTab === 'citas'
-              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span>Mis Citas ({citas.length})</span>
-        </button>
+      {canEditFicha && (
+        <div className="space-y-3 border border-neutral-200 p-5">
+          <h3 className="text-base font-medium">Fichas CRM publicadas</h3>
+          <p className="text-sm text-neutral-500">Estas fichas son las que ve cada cliente en su cuenta.</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {clientes.map((cl) => (
+              <button
+                key={cl.id}
+                type="button"
+                onClick={() => openFicha(cl)}
+                className="border border-neutral-200 p-4 text-left hover:border-neutral-900"
+              >
+                <p className="text-sm font-medium">{cl.nombre}</p>
+                <p className="mt-1 text-xs text-neutral-500">{cl.diagnostico || cl.tipoPiel || 'Sin diagnóstico'}</p>
+                <span className="mt-2 inline-block text-[10px] font-semibold uppercase tracking-[0.14em]">Editar ficha</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
-        <button
-          onClick={() => setActiveTab('reservas')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-            activeTab === 'reservas'
-              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          <span>Productos en Camino ({productosEnCamino.length})</span>
+      <div className="flex items-center gap-2 border-b border-neutral-200 pb-3">
+        <button type="button" onClick={() => setActiveTab('citas')} className={tabClass(activeTab === 'citas')}>
+          <Calendar className="h-4 w-4" />
+          Citas ({citas.length})
         </button>
-
-        <button
-          onClick={() => setActiveTab('perfil')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-            activeTab === 'perfil'
-              ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-          }`}
-        >
-          <UserCheck className="w-4 h-4" />
-          <span>Ficha de Piel</span>
+        <button type="button" onClick={() => setActiveTab('reservas')} className={tabClass(activeTab === 'reservas')}>
+          <Clock className="h-4 w-4" />
+          En camino ({productosEnCamino.length})
+        </button>
+        <button type="button" onClick={() => setActiveTab('perfil')} className={tabClass(activeTab === 'perfil')}>
+          <UserCheck className="h-4 w-4" />
+          Ficha clínica
         </button>
       </div>
 
-      {/* PESTAÑA 1: CITAS AGENDADAS */}
       {activeTab === 'citas' && (
         <div className="space-y-4">
           {citas.length === 0 ? (
-            <GlassCard className="p-8 text-center flex flex-col items-center justify-center space-y-3">
-              <Calendar className="w-8 h-8 text-gray-400" />
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">No tienes citas activas</p>
-              <AuroraButton onClick={() => navigate('/citas')} className="px-6 py-2 text-xs font-semibold">
-                Agendar mi primera valoración
-              </AuroraButton>
-            </GlassCard>
+            <div className="flex flex-col items-center gap-4 border border-neutral-200 px-6 py-12 text-center">
+              <Calendar className="h-8 w-8 text-neutral-400" />
+              <p className="text-sm font-medium">No tienes citas activas</p>
+              <button
+                type="button"
+                onClick={() => navigate('/citas')}
+                className="bg-neutral-900 px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white"
+              >
+                Agendar valoración
+              </button>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {citas.map((cita) => {
                 const calUrl = generateGoogleCalendarUrl({
                   titulo: `Cita: ${cita.servicioTitulo} - La Burbuja de Milo`,
@@ -105,146 +150,100 @@ export default function ClienteDashboard() {
                 });
 
                 return (
-                  <GlassCard key={cita.id} className="p-5 flex flex-col justify-between space-y-4 border border-gray-200/60 dark:border-white/10 hover:shadow-md transition-all">
+                  <article key={cita.id} className="flex flex-col justify-between border border-neutral-200 p-5">
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          cita.estado === 'Confirmada'
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                            : cita.estado === 'Pendiente'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                            : cita.estado === 'Realizada'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                            : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400'
-                        }`}>
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${statusClass(cita.estado)}`}>
                           {cita.estado}
                         </span>
-                        <span className="text-xs text-gray-400 flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5" />
+                        <span className="flex items-center gap-1 text-xs text-neutral-400">
+                          <Clock className="h-3.5 w-3.5" />
                           {cita.duracionMinutos || 60} min
                         </span>
                       </div>
-
-                      <h3 className="text-base font-bold text-gray-900 dark:text-white">
-                        {cita.servicioTitulo}
-                      </h3>
-
-                      <div className="mt-3 space-y-1 text-xs text-gray-600 dark:text-gray-300">
-                        <p className="flex items-center gap-2">
-                          <Calendar className="w-3.5 h-3.5 text-pink-500" />
-                          <span><strong>Fecha:</strong> {cita.fecha} — {cita.hora}</span>
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-                          <span><strong>Titular:</strong> {cita.clienteNombre}</span>
-                        </p>
-                        {cita.notasCliente && (
-                          <p className="text-[11px] text-gray-400 italic pt-1">
-                            "{cita.notasCliente}"
-                          </p>
-                        )}
-                      </div>
+                      <h3 className="text-base font-medium">{cita.servicioTitulo}</h3>
+                      <p className="mt-3 text-sm text-neutral-600">
+                        {cita.fecha} · {cita.hora}
+                      </p>
+                      <p className="mt-1 text-sm text-neutral-500">{cita.clienteNombre}</p>
+                      {cita.notasCliente && (
+                        <p className="mt-2 text-xs italic text-neutral-400">“{cita.notasCliente}”</p>
+                      )}
                     </div>
-
-                    <div className="pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
+                    <div className="mt-4 flex items-center justify-between border-t border-neutral-200 pt-3">
                       <a
                         href={calUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-xs font-semibold transition-colors"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline"
                       >
-                        <CalendarPlus className="w-3.5 h-3.5" />
-                        <span>Sincronizar a Google Calendar</span>
+                        <CalendarPlus className="h-3.5 w-3.5" />
+                        Calendar
                       </a>
-
-                      <span className="text-[11px] text-gray-400">Cabina Principal</span>
+                      <span className="text-[11px] uppercase tracking-[0.12em] text-neutral-400">Cabina</span>
                     </div>
-                  </GlassCard>
+                  </article>
                 );
               })}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() => navigate('/mi-burbuja/skincare')}
+            className="text-xs font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline"
+          >
+            Ver rutina y progreso
+          </button>
         </div>
       )}
 
-      {/* PESTAÑA 2: PRODUCTOS EN CAMINO Y PREVENTA */}
       {activeTab === 'reservas' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-300 text-xs flex items-start gap-3">
-            <Clock className="w-5 h-5 shrink-0 mt-0.5 text-purple-500" />
-            <div>
-              <p className="font-bold">Monitoreo de Arribos Internacionales</p>
-              <p className="text-[11px] opacity-90 mt-0.5">
-                Los productos que se encuentran en tránsito pueden ser apartados sin costo inicial. Te contactaremos vía WhatsApp tan pronto ingresen a nuestro inventario para despacharlos inmediatamente.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-6">
+          <p className="border border-neutral-200 bg-[#f6f6f6] p-4 text-sm text-neutral-600">
+            Los productos en tránsito se apartan sin costo inicial. Te avisamos por WhatsApp al ingresar a inventario.
+          </p>
+          <div className="grid grid-cols-2 items-stretch gap-x-4 gap-y-10 md:grid-cols-3">
             {productosEnCamino.map((prod) => (
-              <GlassCard key={prod.id} className="p-5 flex flex-col justify-between space-y-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 rounded-md">
-                      En Camino
-                    </span>
-                    <span className="text-xs font-medium text-gray-400">
-                      Arribo: {prod.fechaLlegada}
-                    </span>
-                  </div>
-                  <h4 className="text-sm font-bold text-gray-900 dark:text-white">{prod.nombre}</h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-1">{prod.descripcion}</p>
-                </div>
-
-                <div className="pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
-                  <span className="text-sm font-bold text-gray-900 dark:text-white">${prod.precio.toFixed(2)}</span>
-                  <button
-                    onClick={() => MiloStore.addToCarrito(prod, 'reserva_en_camino')}
-                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:opacity-90 active:scale-95 transition-all"
-                  >
-                    Apartar
-                  </button>
-                </div>
-              </GlassCard>
+              <ProductCard
+                key={prod.id}
+                product={prod}
+                onQuickBuy={handleQuickBuy}
+                onOpen={() => navigate('/tienda?filtro=en-camino')}
+              />
             ))}
           </div>
         </div>
       )}
 
-      {/* PESTAÑA 3: FICHA DE PIEL */}
       {activeTab === 'perfil' && (
-        <GlassCard className="p-6 sm:p-8 space-y-4 max-w-2xl">
-          <div className="flex items-center gap-3 border-b border-gray-100 dark:border-white/5 pb-4">
-            <div className="w-12 h-12 rounded-full bg-pink-500/10 text-pink-500 flex items-center justify-center font-bold text-lg">
-              ✨
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Perfil Estético & Recomendaciones</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Actualizado según tu última valoración en cabina</p>
-            </div>
+        <div className="max-w-2xl space-y-6 border border-neutral-200 p-6 sm:p-8">
+          <div className="border-b border-neutral-200 pb-4">
+            <h3 className="text-xl font-medium">Ficha clínica</h3>
+            <p className="mt-1 text-sm text-neutral-500">
+              {ficha
+                ? 'Publicada por el equipo desde tu ficha CRM: facial, corporal y bienestar.'
+                : 'Aún no hay una ficha asociada a tu cuenta. Se completa tras tu valoración en cabina.'}
+            </p>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div className="p-3 rounded-xl bg-gray-50 dark:bg-white/5 space-y-1">
-              <span className="text-gray-400 block uppercase font-bold text-[10px]">Diagnóstico de Manto Lipídico</span>
-              <p className="font-semibold text-gray-800 dark:text-gray-200">Barrera Cutánea Normal a Mixta</p>
-            </div>
-            <div className="p-3 rounded-xl bg-gray-50 dark:bg-white/5 space-y-1">
-              <span className="text-gray-400 block uppercase font-bold text-[10px]">Activos Recomendados</span>
-              <p className="font-semibold text-gray-800 dark:text-gray-200">Centella Asiática, Ácido Hialurónico, Filtro Mineral</p>
-            </div>
-            <div className="p-3 rounded-xl bg-gray-50 dark:bg-white/5 space-y-1">
-              <span className="text-gray-400 block uppercase font-bold text-[10px]">Próxima Sesión Sugerida</span>
-              <p className="font-semibold text-gray-800 dark:text-gray-200">Limpieza Profunda e Hidratación Ultrasónica</p>
-            </div>
-            <div className="p-3 rounded-xl bg-gray-50 dark:bg-white/5 space-y-1">
-              <span className="text-gray-400 block uppercase font-bold text-[10px]">Skin Concierge Asignado</span>
-              <p className="font-semibold text-gray-800 dark:text-gray-200">Dra. Milo & Especialistas</p>
-            </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {fichaCampos.map(([label, value]) => (
+              <div key={label} className="border border-neutral-200 p-4">
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-400">{label}</span>
+                <p className="mt-2 text-sm font-medium">{value}</p>
+              </div>
+            ))}
           </div>
-        </GlassCard>
+          {canEditFicha && ficha && (
+            <button
+              type="button"
+              onClick={() => openFicha(ficha)}
+              className="text-[11px] font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline"
+            >
+              Editar esta ficha
+            </button>
+          )}
+        </div>
       )}
-
     </div>
   );
 }

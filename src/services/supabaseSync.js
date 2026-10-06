@@ -1,4 +1,6 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { withProductPasillos, productPasillos } from '../lib/pasillos';
+import { bannerFotoSrc, cloneBanner, normalizeBannerFoto } from '../lib/bannerFrames';
 
 const KEYS = {
   BANNERS: 'milo_banners',
@@ -7,7 +9,8 @@ const KEYS = {
   CITAS: 'milo_citas',
   SERVICIOS: 'milo_servicios',
   CLIENTES: 'milo_clientes',
-  BLOG: 'milo_blog'
+  BLOG: 'milo_blog',
+  MOVIMIENTOS: 'milo_movimientos'
 };
 
 function toIsoDate(value) {
@@ -29,40 +32,66 @@ function formatDisplayDate(value) {
 }
 
 export function mapProductoFromDb(row) {
-  return {
+  const pasillos = Array.isArray(row.pasillos) && row.pasillos.length
+    ? row.pasillos.filter(Boolean)
+    : (row.pasillo_id ? [row.pasillo_id] : ['skincare']);
+  return withProductPasillos({
     id: row.id,
     nombre: row.nombre,
-    pasillo: row.pasillo_id,
+    pasillo: pasillos[0] || row.pasillo_id,
+    pasillos,
     precio: Number(row.precio) || 0,
-    moneda: row.moneda || 'USD',
+    moneda: row.moneda || 'COP',
     stock: Number(row.stock) || 0,
     enCamino: Boolean(row.en_camino),
     fechaLlegada: row.fecha_llegada || null,
     cuposReserva: Number(row.cupos_reserva) || 0,
     reservasActuales: Number(row.reservas_actuales) || 0,
     tag: row.tag || '',
+    marca: row.marca || '',
     descripcion: row.descripcion || '',
     ingredientes: row.ingredientes || '',
-    modoUso: row.modo_uso || ''
-  };
+    modoUso: row.modo_uso || '',
+    imagen: row.imagen || '',
+    stockMinimo: Number(row.stock_minimo) >= 0 ? Number(row.stock_minimo) : 3,
+    variantes: Array.isArray(row.variantes) ? row.variantes : [],
+    stockReal: row.stock_real === false || (Array.isArray(row.variantes) && row.variantes.some((item) => item?.stockReal === false))
+      ? false
+      : true,
+    updatedAt: row.updated_at || null
+  });
 }
 
 function mapProductoToDb(producto) {
+  const normalized = withProductPasillos(producto);
+  const pasillos = productPasillos(normalized);
   return {
     id: producto.id,
     nombre: producto.nombre,
-    pasillo_id: producto.pasillo || 'skincare',
+    pasillo_id: pasillos[0] || 'skincare',
+    pasillos,
     precio: Number(producto.precio) || 0,
-    moneda: producto.moneda || 'USD',
+    moneda: producto.moneda || 'COP',
     stock: Number(producto.stock) || 0,
     en_camino: Boolean(producto.enCamino),
     fecha_llegada: toIsoDate(producto.fechaLlegada),
     cupos_reserva: Number(producto.cuposReserva) || 0,
     reservas_actuales: Number(producto.reservasActuales) || 0,
     tag: producto.tag || null,
+    marca: producto.marca || null,
     descripcion: producto.descripcion || null,
     ingredientes: producto.ingredientes || null,
-    modo_uso: producto.modoUso || null
+    modo_uso: producto.modoUso || null,
+    imagen: producto.imagen || null,
+    stock_minimo: Number(producto.stockMinimo) >= 0 ? Number(producto.stockMinimo) : 3,
+    stock_real: producto.stockReal !== false,
+    variantes: Array.isArray(producto.variantes)
+      ? producto.variantes.map((variante) => (
+        producto.stockReal === false
+          ? { ...variante, stockReal: false }
+          : variante
+      ))
+      : []
   };
 }
 
@@ -77,22 +106,36 @@ export function mapBannerFromDb(row) {
     botonSecundarioTexto: row.boton_secundario_texto || '',
     botonSecundarioEnlace: row.boton_secundario_enlace || '',
     activo: row.activo !== false,
-    gradiente: row.gradiente || ''
+    gradiente: row.gradiente || '',
+    imagen: row.imagen || '',
+    imagenes: Array.isArray(row.imagenes) ? row.imagenes : (row.imagen ? [row.imagen] : []),
+    marcoLayout: row.marco_layout || '',
+    marcoEstilo: row.marco_estilo || '',
+    transicion: row.transicion || ''
   };
 }
 
 function mapBannerToDb(banner, index = 0) {
+  const cloned = cloneBanner(banner);
+  const imagenes = Array.isArray(cloned.imagenes)
+    ? cloned.imagenes.map(normalizeBannerFoto).filter((item) => item.src)
+    : (cloned.imagen ? [normalizeBannerFoto(cloned.imagen)] : []);
   return {
-    id: banner.id,
-    tag: banner.tag || null,
-    titulo: banner.titulo,
-    descripcion: banner.descripcion || null,
-    boton_texto: banner.botonTexto || null,
-    boton_enlace: banner.botonEnlace || null,
-    boton_secundario_texto: banner.botonSecundarioTexto || null,
-    boton_secundario_enlace: banner.botonSecundarioEnlace || null,
-    activo: banner.activo !== false,
-    gradiente: banner.gradiente || null,
+    id: cloned.id,
+    tag: cloned.tag || null,
+    titulo: cloned.titulo,
+    descripcion: cloned.descripcion || null,
+    boton_texto: cloned.botonTexto || null,
+    boton_enlace: cloned.botonEnlace || null,
+    boton_secundario_texto: cloned.botonSecundarioTexto || null,
+    boton_secundario_enlace: cloned.botonSecundarioEnlace || null,
+    activo: cloned.activo !== false,
+    gradiente: cloned.gradiente || null,
+    imagen: imagenes[0]?.src || bannerFotoSrc(cloned.imagen) || null,
+    imagenes,
+    marco_layout: cloned.marcoLayout || 'unica',
+    marco_estilo: cloned.marcoEstilo || 'lleno',
+    transicion: cloned.transicion || 'fundido',
     orden: index
   };
 }
@@ -105,6 +148,15 @@ export function mapPasilloFromDb(row) {
   };
 }
 
+function mapPasilloToDb(pasillo, index) {
+  return {
+    id: pasillo.id,
+    nombre: pasillo.nombre,
+    icon: pasillo.icon || 'Sparkles',
+    orden: index
+  };
+}
+
 export function mapServicioFromDb(row) {
   return {
     id: row.id,
@@ -113,7 +165,22 @@ export function mapServicioFromDb(row) {
     duracionMinutos: Number(row.duracion_minutos) || 60,
     precio: Number(row.precio) || 0,
     descripcion: row.descripcion || '',
-    recomendado: row.recomendado || ''
+    recomendado: row.recomendado || '',
+    imagen: row.imagen || ''
+  };
+}
+
+function mapServicioToDb(servicio) {
+  return {
+    id: servicio.id,
+    titulo: servicio.titulo,
+    categoria: servicio.categoria || null,
+    duracion_minutos: Number(servicio.duracionMinutos) || 60,
+    precio: Number(servicio.precio) || 0,
+    descripcion: servicio.descripcion || null,
+    recomendado: servicio.recomendado || null,
+    imagen: servicio.imagen || null,
+    activo: servicio.activo !== false
   };
 }
 
@@ -165,7 +232,11 @@ export function mapClienteFromDb(row) {
     citasCount: Number(row.citas_count) || 0,
     pedidosCount: Number(row.pedidos_count) || 0,
     reservasActivas: Number(row.reservas_activas) || 0,
-    notasCRM: row.notas_crm || ''
+    notasCRM: row.notas_crm || '',
+    diagnostico: row.diagnostico || '',
+    activosRecomendados: row.activos_recomendados || '',
+    proximaSesion: row.proxima_sesion || '',
+    skinConcierge: row.skin_concierge || ''
   };
 }
 
@@ -181,7 +252,11 @@ function mapClienteToDb(cliente) {
     citas_count: Number(cliente.citasCount) || 0,
     pedidos_count: Number(cliente.pedidosCount) || 0,
     reservas_activas: Number(cliente.reservasActivas) || 0,
-    notas_crm: cliente.notasCRM || null
+    notas_crm: cliente.notasCRM || null,
+    diagnostico: cliente.diagnostico || null,
+    activos_recomendados: cliente.activosRecomendados || null,
+    proxima_sesion: cliente.proximaSesion || null,
+    skin_concierge: cliente.skinConcierge || null
   };
 }
 
@@ -194,7 +269,8 @@ export function mapBlogFromDb(row) {
     fecha: formatDisplayDate(row.fecha),
     tiempoLectura: row.tiempo_lectura || '',
     resumen: row.resumen || '',
-    contenido: row.contenido || ''
+    contenido: row.contenido || '',
+    imagen: row.imagen || ''
   };
 }
 
@@ -208,8 +284,73 @@ function mapBlogToDb(post) {
     tiempo_lectura: post.tiempoLectura || null,
     resumen: post.resumen || null,
     contenido: post.contenido || null,
+    imagen: post.imagen || null,
     publicado: true
   };
+}
+
+function mapMovimientoFromDb(row) {
+  return {
+    id: row.id,
+    productoId: row.producto_id,
+    productoNombre: row.producto_nombre || '',
+    tipo: row.tipo,
+    cantidad: Number(row.cantidad) || 0,
+    delta: Number(row.delta) || 0,
+    stockAntes: Number(row.stock_antes) || 0,
+    stockDespues: Number(row.stock_despues) || 0,
+    motivo: row.motivo || '',
+    nota: row.nota || '',
+    origen: row.origen || '',
+    varianteId: row.variante_id || '',
+    varianteNombre: row.variante_nombre || '',
+    fecha: row.fecha
+  };
+}
+
+function mapMovimientoToDb(movimiento) {
+  return {
+    id: movimiento.id,
+    producto_id: movimiento.productoId,
+    producto_nombre: movimiento.productoNombre || null,
+    tipo: movimiento.tipo,
+    cantidad: Number(movimiento.cantidad) || 0,
+    delta: Number(movimiento.delta) || 0,
+    stock_antes: Number(movimiento.stockAntes) || 0,
+    stock_despues: Number(movimiento.stockDespues) || 0,
+    motivo: movimiento.motivo || null,
+    nota: movimiento.nota || null,
+    origen: movimiento.origen || null,
+    variante_id: movimiento.varianteId || null,
+    variante_nombre: movimiento.varianteNombre || null,
+    fecha: movimiento.fecha || new Date().toISOString()
+  };
+}
+
+async function upsertRows(table, rows, mapToDb) {
+  if (!supabase || !Array.isArray(rows) || !rows.length) return;
+  const mapped = rows.map(mapToDb);
+  const { error } = await supabase.from(table).upsert(mapped);
+  if (!error) return;
+  if (table === 'productos') {
+    const missingVariantes = /variantes|stock_real/i.test(error.message || '');
+    const missingPasillos = /pasillos/i.test(error.message || '');
+    if (missingVariantes || missingPasillos) {
+      const fallback = mapped.map((row) => {
+        const next = { ...row };
+        if (missingVariantes) {
+          delete next.variantes;
+          delete next.stock_real;
+        }
+        if (missingPasillos) delete next.pasillos;
+        return next;
+      });
+      const { error: retryError } = await supabase.from(table).upsert(fallback);
+      if (retryError) throw retryError;
+      return;
+    }
+  }
+  throw error;
 }
 
 async function replaceRows(table, rows, mapToDb) {
@@ -218,7 +359,16 @@ async function replaceRows(table, rows, mapToDb) {
   const ids = mapped.map((row) => row.id);
 
   const { error: upsertError } = await supabase.from(table).upsert(mapped);
-  if (upsertError) throw upsertError;
+  if (upsertError) {
+    const extraBanner = table === 'banners' && /imagenes|marco_layout|marco_estilo|transicion/i.test(upsertError.message || '');
+    if (extraBanner) {
+      const fallback = mapped.map(({ imagenes, marco_layout, marco_estilo, transicion, ...row }) => row);
+      const { error: retryError } = await supabase.from(table).upsert(fallback);
+      if (retryError) throw retryError;
+    } else {
+      throw upsertError;
+    }
+  }
 
   const { data: existing, error: readError } = await supabase.from(table).select('id');
   if (readError) throw readError;
@@ -265,7 +415,23 @@ export async function hydrateFromSupabase(writeLocal) {
     writeLocal(KEYS.CLIENTES, (clientes.data || []).map(mapClienteFromDb));
   }
   writeLocal(KEYS.BLOG, (blog.data || []).map(mapBlogFromDb));
+
+  const movimientos = await supabase
+    .from('inventario_movimientos')
+    .select('*')
+    .order('fecha', { ascending: false });
+  if (!movimientos.error && (movimientos.data || []).length > 0) {
+    writeLocal(KEYS.MOVIMIENTOS, movimientos.data.map(mapMovimientoFromDb));
+  }
+
   return true;
+}
+
+export function deleteRemoteRow(table, id) {
+  if (!isSupabaseConfigured || !supabase || !id) return;
+  supabase.from(table).delete().eq('id', id).then(({ error }) => {
+    if (error) console.warn(`Supabase aún no pudo borrar ${table}:`, error.message || error);
+  });
 }
 
 export function syncStoreKey(key, data) {
@@ -274,7 +440,7 @@ export function syncStoreKey(key, data) {
   const task = (async () => {
     switch (key) {
       case KEYS.PRODUCTOS:
-        await replaceRows('productos', data, mapProductoToDb);
+        await upsertRows('productos', data, mapProductoToDb);
         break;
       case KEYS.BANNERS:
         await replaceRows('banners', data, mapBannerToDb);
@@ -287,6 +453,15 @@ export function syncStoreKey(key, data) {
         break;
       case KEYS.BLOG:
         await replaceRows('blog_posts', data, mapBlogToDb);
+        break;
+      case KEYS.SERVICIOS:
+        await replaceRows('servicios', data, mapServicioToDb);
+        break;
+      case KEYS.PASILLOS:
+        await replaceRows('pasillos', data, mapPasilloToDb);
+        break;
+      case KEYS.MOVIMIENTOS:
+        await replaceRows('inventario_movimientos', data, mapMovimientoToDb);
         break;
       default:
         break;

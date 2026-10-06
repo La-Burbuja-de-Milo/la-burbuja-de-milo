@@ -1,41 +1,34 @@
 import React from 'react';
-import GlassCard from '../../../components/ui/GlassCard';
 import { CheckCircle2, Circle } from 'lucide-react';
 
 export default function RutinaWidget() {
   const mockRutina = [
-    { id: 1, step: 'Limpieza', product: 'Gel Limpiador Suave', done: true },
-    { id: 2, step: 'Tratamiento', product: 'Serum Vitamina C', done: false },
-    { id: 3, step: 'Hidratación', product: 'Crema Ligera', done: false },
-    { id: 4, step: 'Protección', product: 'SPF 50+', done: false },
+    { id: 1, step: 'Facial', product: 'Limpieza Incellderm + sérum de cabina', done: true },
+    { id: 2, step: 'Corporal', product: 'Gel reafirmante en abdomen y piernas', done: false },
+    { id: 3, step: 'Bienestar', product: 'fuXion Cafezzino o colágeno Lifening', done: false },
+    { id: 4, step: 'Protección', product: 'SPF 50+ Riman o mineral Milo', done: false },
   ];
 
   return (
-    <GlassCard className="flex flex-col h-full">
-      <div className="h-[40px] flex items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Rutina de Hoy (AM)</h2>
-      </div>
-
-      <div className="flex-1 flex flex-col gap-2">
+    <section className="flex h-full flex-col border border-neutral-200 p-5">
+      <h2 className="mb-4 text-xl font-medium tracking-tight">Rutina de hoy (AM)</h2>
+      <div className="flex flex-1 flex-col gap-2">
         {mockRutina.map((item) => (
-          <div 
-            key={item.id} 
-            className="flex items-center gap-3 p-3 bg-white/40 dark:bg-gray-800/40 rounded-xl cursor-pointer active:scale-[0.98] transition-transform"
-          >
+          <div key={item.id} className="flex items-center gap-3 border border-neutral-200 p-3">
             {item.done ? (
-              <CheckCircle2 className="w-5 h-5 text-pink-500 drop-shadow-[0_0_4px_rgba(236,72,153,0.5)]" />
+              <CheckCircle2 className="h-5 w-5 text-neutral-900" />
             ) : (
-              <Circle className="w-5 h-5 text-gray-300 dark:text-gray-600" />
+              <Circle className="h-5 w-5 text-neutral-300" />
             )}
             <div className="flex flex-col">
-              <span className={`text-sm font-medium ${item.done ? 'text-gray-500 line-through' : 'text-gray-900 dark:text-white'}`}>
+              <span className={`text-sm font-medium ${item.done ? 'text-neutral-400 line-through' : 'text-neutral-900'}`}>
                 {item.step}
               </span>
-              <span className="text-xs text-gray-500">{item.product}</span>
+              <span className="text-xs text-neutral-500">{item.product}</span>
             </div>
           </div>
         ))}
       </div>
-    </GlassCard>
+    </section>
   );
 }
