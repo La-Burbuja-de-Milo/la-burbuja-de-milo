@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { MiloStore } from '../services/miloStore';
 import { esStockGenerico } from '../lib/variantes';
 import ImageUploader from '../components/admin/ImageUploader';
+import ImageFocusPicker from '../components/admin/ImageFocusPicker';
 import { useAuth } from './AuthContext';
 import { isGerente, isStaff } from '../lib/roles';
 import { hasEditParam } from '../lib/visualEdit';
@@ -10,7 +11,7 @@ import { bannerDraft, bannerPersistPayload, withBannerFrames } from '../lib/bann
 import { productPasillos, withProductPasillos } from '../lib/pasillos';
 import BannerPhotosFields from '../components/admin/BannerPhotosFields';
 import CategoryCirclesFields from '../components/admin/CategoryCirclesFields';
-import { withCategoryCircles } from '../lib/categoryCircles';
+import { withCategoryCircles, normalizeSiteLogo } from '../lib/categoryCircles';
 
 const CmsEditContext = createContext(null);
 
@@ -256,6 +257,8 @@ export function CmsEditProvider({ children }) {
   const [promoForm, setPromoForm] = useState(MiloStore.getAjustes());
   const [circlesOpen, setCirclesOpen] = useState(false);
   const [circlesForm, setCirclesForm] = useState(() => withCategoryCircles(MiloStore.getAjustes()));
+  const [logoOpen, setLogoOpen] = useState(false);
+  const [logoForm, setLogoForm] = useState(() => normalizeSiteLogo());
 
   const openProduct = (item = null) => {
     setProduct(item);
@@ -321,6 +324,11 @@ export function CmsEditProvider({ children }) {
     setCirclesOpen(true);
   };
 
+  const openLogo = () => {
+    setLogoForm(normalizeSiteLogo(MiloStore.getAjustes().logo));
+    setLogoOpen(true);
+  };
+
   useEffect(() => {
     const refreshCatalog = () => {
       setPasillos(MiloStore.getPasillos());
@@ -332,7 +340,7 @@ export function CmsEditProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, bannerOpen }),
+    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, openLogo, bannerOpen }),
     [bannerOpen]
   );
 
@@ -731,6 +739,46 @@ export function CmsEditProvider({ children }) {
             <CategoryCirclesFields form={circlesForm} onChange={setCirclesForm} />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setCirclesOpen(false)} className={ghostBtn}>Cancelar</button>
+              <button type="submit" className={primaryBtn}>Publicar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {logoOpen && (
+        <Modal title="Logo del sitio" onClose={() => setLogoOpen(false)}>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const current = MiloStore.getAjustes();
+              MiloStore.saveAjustes({ ...current, logo: normalizeSiteLogo(logoForm) });
+              setLogoOpen(false);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-neutral-500">
+              Sube la foto, recórtala y usa acercar, espejo o giro. Lo que quede dentro del círculo es lo que se publica junto al nombre.
+            </p>
+            <ImageFocusPicker
+              src={logoForm.imagen}
+              seed="site-logo"
+              posX={logoForm.posX}
+              posY={logoForm.posY}
+              zoom={logoForm.zoom}
+              flipX={logoForm.flipX}
+              flipY={logoForm.flipY}
+              rotate={logoForm.rotate}
+              onChange={(patch) => setLogoForm((current) => ({ ...current, ...patch }))}
+              grabHint="Agarra la foto y muévela: lo que quede dentro del círculo es el logo"
+            />
+            <ImageUploader
+              compact
+              label="Foto del logo"
+              value={logoForm.imagen}
+              onChange={(imagen) => setLogoForm((current) => ({ ...current, imagen }))}
+            />
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setLogoOpen(false)} className={ghostBtn}>Cancelar</button>
               <button type="submit" className={primaryBtn}>Publicar</button>
             </div>
           </form>

@@ -48,7 +48,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, loading } = useAuth();
-  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles } = useCmsEdit();
+  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles, openLogo } = useCmsEdit();
   const gerente = isGerente(profile?.rol);
   const requestedTab = searchParams.get('tab') || 'resumen';
   const activeTab = ADMIN_TABS.includes(requestedTab) ? requestedTab : 'resumen';
@@ -372,6 +372,34 @@ export default function AdminDashboard() {
                 Newsletter: {(ajustes.newsletterEmails || []).length} correos inscritos desde Inicio.
               </p>
             )}
+          </div>
+
+          <div className={`${panel} space-y-4 p-6`}>
+            <div>
+              <h3 className="text-lg font-medium">Logo del sitio</h3>
+              <p className="text-sm text-neutral-500">Círculo junto al nombre: foto, recorte, zoom, espejo y giro.</p>
+            </div>
+            <div className="flex items-center gap-4">
+              {ajustes.logo?.imagen ? (
+                <ProductVisual
+                  seed="site-logo"
+                  src={ajustes.logo.imagen}
+                  posX={ajustes.logo.posX}
+                  posY={ajustes.logo.posY}
+                  zoom={ajustes.logo.zoom}
+                  flipX={ajustes.logo.flipX}
+                  flipY={ajustes.logo.flipY}
+                  rotate={ajustes.logo.rotate}
+                  focalCrop
+                  className="h-16 w-16 shrink-0 rounded-full"
+                />
+              ) : (
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#efeae2] text-lg font-semibold">B</span>
+              )}
+              <button type="button" onClick={openLogo} className={primaryBtn}>
+                Editar logo
+              </button>
+            </div>
           </div>
 
           <div className={`${panel} space-y-3 p-6`}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Moon,
@@ -23,6 +23,7 @@ import { CmsEditProvider, useCmsEdit, useVisualEdit } from '../../context/CmsEdi
 import { isGerente, isStaff } from '../../lib/roles';
 import { hasEditParam, navHrefForStaff, withoutEditParam } from '../../lib/visualEdit';
 import PublishCatalogButton from '../admin/PublishCatalogButton';
+import ProductVisual from '../shop/ProductVisual';
 
 const CATEGORY_LINKS = [
   { to: '/', label: 'Inicio', end: true },
@@ -54,6 +55,103 @@ function linkActive(pathname, search, to, end) {
   return pathname === path && !cleanSearch.includes('pasillo') && !cleanSearch.includes('filtro');
 }
 
+function SiteLogo({ logo, href, editable, onEdit }) {
+  const src = logo?.imagen || '';
+  const mark = src ? (
+    <ProductVisual
+      seed="site-logo"
+      src={src}
+      posX={logo.posX}
+      posY={logo.posY}
+      zoom={logo.zoom}
+      flipX={logo.flipX}
+      flipY={logo.flipY}
+      rotate={logo.rotate}
+      focalCrop
+      className={`pointer-events-none aspect-square h-9 w-9 shrink-0 rounded-full sm:h-10 sm:w-10 ${
+        editable ? 'ring-1 ring-dashed ring-neutral-400' : ''
+      }`}
+    />
+  ) : (
+    <span
+      aria-hidden="true"
+      className={`flex h-9 w-9 items-center justify-center rounded-full bg-[#efeae2] text-[13px] font-semibold tracking-tight sm:h-10 sm:w-10 dark:bg-neutral-800 ${
+        editable ? 'ring-1 ring-dashed ring-neutral-400' : ''
+      }`}
+    >
+      B
+    </span>
+  );
+
+  if (editable) {
+    return (
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label="Editar logo del sitio"
+        className="shrink-0"
+      >
+        {mark}
+      </button>
+    );
+  }
+
+  return (
+    <NavLink to={href} aria-label="Inicio" className="shrink-0">
+      {mark}
+    </NavLink>
+  );
+}
+
+function PromoRibbon({ text, editable, onEdit }) {
+  const copyRef = useRef(null);
+  const [seconds, setSeconds] = useState(18);
+
+  useEffect(() => {
+    const node = copyRef.current;
+    if (!node) return undefined;
+    const read = () => {
+      const width = node.getBoundingClientRect().width;
+      setSeconds(Math.max(16, width / 36));
+    };
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [text, editable]);
+
+  const line = editable ? `${text} · Editar` : text;
+  const className = `w-full bg-[#cfcfcf] text-[11px] text-neutral-900 ${editable ? 'hover:bg-[#c4c4c4]' : ''}`;
+  const inner = (
+    <>
+      <span className="hidden px-4 py-2 text-center text-[13px] leading-snug lg:block">{line}</span>
+      <div className="overflow-hidden py-1.5 lg:hidden">
+        <span
+          className="milo-marquee-track flex w-max items-center"
+          style={{ animationDuration: `${seconds}s` }}
+        >
+          <span ref={copyRef} className="whitespace-nowrap px-8 leading-5">{line}</span>
+          <span className="whitespace-nowrap px-8 leading-5" aria-hidden="true">{line}</span>
+        </span>
+      </div>
+    </>
+  );
+
+  if (editable) {
+    return (
+      <button type="button" onClick={onEdit} className={className}>
+        {inner}
+      </button>
+    );
+  }
+
+  return (
+    <div className={className} role="marquee" aria-label={text}>
+      {inner}
+    </div>
+  );
+}
+
 export default function AppLayout() {
   return (
     <CmsEditProvider>
@@ -64,7 +162,7 @@ export default function AppLayout() {
 
 function AppChrome() {
   const { session, profile, signOut } = useAuth();
-  const { openPromo } = useCmsEdit();
+  const { openPromo, openLogo } = useCmsEdit();
   const { canEditCatalog } = useVisualEdit();
   const canOpenCrm = isStaff(profile?.rol);
   const gerente = isGerente(profile?.rol);
@@ -94,7 +192,6 @@ function AppChrome() {
   const [cartCount, setCartCount] = useState(0);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [ajustes, setAjustes] = useState(() => MiloStore.getAjustes());
 
@@ -125,14 +222,13 @@ function AppChrome() {
 
   useEffect(() => {
     setIsMenuOpen(false);
-    setIsSearchOpen(false);
   }, [location.pathname, location.search]);
 
   const submitSearch = (event) => {
     event.preventDefault();
     const value = query.trim();
     navigate(value ? `/tienda?q=${encodeURIComponent(value)}` : '/tienda');
-    setIsSearchOpen(false);
+    setIsMenuOpen(false);
   };
 
   return (
@@ -142,24 +238,12 @@ function AppChrome() {
       </a>
 
       {ajustes.promoActivo !== false && ajustes.promoTexto ? (
-        canEditCatalog ? (
-          <button
-            type="button"
-            onClick={openPromo}
-            className="w-full bg-[#cfcfcf] px-4 py-2.5 text-center text-[13px] text-neutral-900 hover:bg-[#c4c4c4]"
-          >
-            {ajustes.promoTexto} · Editar
-          </button>
-        ) : (
-          <div className="bg-[#cfcfcf] px-4 py-2.5 text-center text-[13px] text-neutral-900">
-            {ajustes.promoTexto}
-          </div>
-        )
+        <PromoRibbon text={ajustes.promoTexto} editable={canEditCatalog} onEdit={openPromo} />
       ) : canEditCatalog ? (
         <button
           type="button"
           onClick={openPromo}
-          className="w-full bg-[#cfcfcf] px-4 py-2.5 text-center text-[13px] text-neutral-900"
+          className="w-full bg-[#cfcfcf] px-3 py-1.5 text-center text-[11px] leading-snug text-neutral-900 sm:px-4 sm:py-2 sm:text-[13px]"
         >
           Barra promocional oculta · Editar
         </button>
@@ -177,35 +261,37 @@ function AppChrome() {
       )}
 
       <header className="sticky top-0 z-40 bg-white text-neutral-900 dark:bg-neutral-950 dark:text-white">
-        <div className="mx-auto flex max-w-[1440px] items-center gap-4 px-4 py-3 lg:px-8">
-          <button
-            type="button"
-            className="p-2 lg:hidden"
-            aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
-            onClick={() => setIsMenuOpen((open) => !open)}
-          >
-            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+        <div className="mx-auto grid max-w-[1440px] grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center px-1 py-1 sm:px-2 lg:flex lg:gap-4 lg:px-8 lg:py-3">
+          <div className="flex items-center justify-start lg:hidden">
+            <button
+              type="button"
+              className="flex h-11 w-11 items-center justify-center"
+              aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+              aria-expanded={isMenuOpen}
+              onClick={() => setIsMenuOpen((open) => !open)}
+            >
+              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
 
-          <button
-            type="button"
-            className="p-2 lg:hidden"
-            aria-label="Abrir búsqueda"
-            onClick={() => setIsSearchOpen((open) => !open)}
-          >
-            <Search className="h-5 w-5" />
-          </button>
+          <div className="flex min-w-0 items-center justify-center gap-1.5 lg:justify-start">
+            <SiteLogo
+              logo={ajustes.logo}
+              href={hrefFor('/')}
+              editable={canEditCatalog}
+              onEdit={openLogo}
+            />
+            <NavLink
+              to={hrefFor('/')}
+              className="min-w-0 text-neutral-900 dark:text-white"
+            >
+              <span className="block whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.06em] sm:text-[13px] sm:tracking-[0.12em] lg:text-[15px] lg:tracking-[0.18em]">
+                La Burbuja de Milo
+              </span>
+            </NavLink>
+          </div>
 
-          <NavLink to={hrefFor('/')} className="mx-auto flex min-w-0 items-center gap-2 text-neutral-900 dark:text-white lg:mx-0">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-900 text-sm font-semibold dark:border-white">
-              B
-            </span>
-            <span className="truncate text-[15px] font-semibold uppercase tracking-[0.18em]">
-              La Burbuja de Milo
-            </span>
-          </NavLink>
-
-          <form onSubmit={submitSearch} className="hidden flex-1 lg:block">
+          <form onSubmit={submitSearch} className="hidden lg:block lg:flex-1">
             <label className="sr-only" htmlFor="busqueda-sitio">Buscar productos</label>
             <input
               id="busqueda-sitio"
@@ -216,20 +302,20 @@ function AppChrome() {
             />
           </form>
 
-          <div className="ml-auto flex items-center gap-1 text-neutral-900 dark:text-white sm:gap-2">
+          <div className="flex items-center justify-end text-neutral-900 dark:text-white lg:ml-auto lg:gap-1">
             {session ? (
               <button
                 type="button"
                 onClick={() => signOut()}
-                className="hidden items-center gap-1.5 px-2 py-2 text-xs font-medium uppercase tracking-wider md:flex"
+                className="hidden items-center gap-1.5 px-2 py-2 text-xs font-medium uppercase tracking-wider lg:flex"
               >
                 <LogOut className="h-4 w-4" />
                 <span>Salir</span>
               </button>
             ) : (
-              <NavLink to="/login" className="flex items-center gap-1.5 px-2 py-2 text-xs font-medium uppercase tracking-wider">
+              <NavLink to="/login" className="hidden items-center gap-1.5 px-2 py-2 text-xs font-medium uppercase tracking-wider lg:flex">
                 <User className="h-5 w-5" />
-                <span className="hidden sm:inline">Sign in</span>
+                <span>Sign in</span>
               </NavLink>
             )}
 
@@ -243,12 +329,12 @@ function AppChrome() {
             <button
               type="button"
               onClick={() => setIsCartOpen(true)}
-              className="relative p-2"
+              className="relative flex h-11 w-11 items-center justify-center"
               aria-label="Abrir bolsa de compras"
             >
               <ShoppingBag className="h-5 w-5" />
               {cartCount > 0 && (
-                <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center bg-neutral-900 px-1 text-[10px] font-bold text-white dark:bg-white dark:text-neutral-900">
+                <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center bg-neutral-900 px-1 text-[10px] font-bold text-white dark:bg-white dark:text-neutral-900">
                   {cartCount}
                 </span>
               )}
@@ -257,27 +343,13 @@ function AppChrome() {
             <button
               type="button"
               onClick={() => setIsDarkMode((value) => !value)}
-              className="p-2"
+              className="hidden h-11 w-11 items-center justify-center lg:flex"
               aria-label="Alternar tema claro u oscuro"
             >
               {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
           </div>
         </div>
-
-        {isSearchOpen && (
-          <form onSubmit={submitSearch} className="border-t border-neutral-200 px-4 py-3 dark:border-neutral-800 lg:hidden">
-            <label className="sr-only" htmlFor="busqueda-movil">Buscar productos</label>
-            <input
-              id="busqueda-movil"
-              autoFocus
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="SEARCH"
-              className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none dark:border-neutral-600 dark:bg-neutral-950 dark:text-white"
-            />
-          </form>
-        )}
 
         <nav className="hidden bg-neutral-950 lg:block" aria-label="Categorías">
           <ul className="mx-auto flex max-w-[1440px] items-center gap-7 overflow-x-auto px-8 py-3">
@@ -302,6 +374,19 @@ function AppChrome() {
 
         {isMenuOpen && (
           <nav className="border-t border-neutral-200 bg-neutral-950 px-4 py-4 dark:border-neutral-800 lg:hidden" aria-label="Menú móvil">
+            <form onSubmit={submitSearch} className="mb-4">
+              <label className="sr-only" htmlFor="busqueda-movil">Buscar productos</label>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/45" />
+                <input
+                  id="busqueda-movil"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Buscar"
+                  className="h-11 w-full border border-white/25 bg-transparent py-2 pl-10 pr-3 text-sm text-white outline-none placeholder:text-white/45"
+                />
+              </div>
+            </form>
             <ul className="flex flex-col gap-3">
               {CATEGORY_LINKS.map((link) => (
                 <li key={link.to}>
@@ -313,6 +398,13 @@ function AppChrome() {
                   </Link>
                 </li>
               ))}
+              {!session && (
+                <li>
+                  <NavLink to="/login" className="block py-1 text-sm uppercase tracking-[0.14em] text-white/80">
+                    Iniciar sesión
+                  </NavLink>
+                </li>
+              )}
               {session && (
                 <li>
                   <button type="button" onClick={() => signOut()} className="py-1 text-sm uppercase tracking-[0.14em] text-white/80">
@@ -327,13 +419,23 @@ function AppChrome() {
                   </NavLink>
                 </li>
               )}
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setIsDarkMode((value) => !value)}
+                  className="flex items-center gap-2 py-1 text-sm uppercase tracking-[0.14em] text-white/80"
+                >
+                  {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  {isDarkMode ? 'Modo claro' : 'Modo oscuro'}
+                </button>
+              </li>
             </ul>
           </nav>
         )}
       </header>
 
-      <div className="border-b border-neutral-200 bg-[#f5f5f5] dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="mx-auto flex max-w-[1440px] items-center gap-8 overflow-x-auto px-4 py-3 text-[13px] text-neutral-700 dark:text-neutral-300 lg:justify-center lg:px-8">
+      <div className="hidden border-b border-neutral-200 bg-[#f5f5f5] dark:border-neutral-800 dark:bg-neutral-900 lg:block">
+        <div className="mx-auto flex max-w-[1440px] items-center justify-center gap-8 overflow-x-auto px-8 py-3 text-[13px] text-neutral-700 dark:text-neutral-300">
           {BENEFITS.map(({ icon: Icon, label }) => (
             <span key={label} className="flex shrink-0 items-center gap-2">
               <Icon className="h-4 w-4" />

@@ -6,7 +6,7 @@ import { deleteRemoteRow, hydrateFromSupabase, publishCatalogToSupabase, syncSto
 import { COP_CODE, toCopAmount } from '../lib/money';
 import { esStockGenerico, findVariante, hasNamedVariantes, stockEstado, withVariantes } from '../lib/variantes';
 import { cloneBanner, withBannerFrames } from '../lib/bannerFrames';
-import { withCategoryCircles } from '../lib/categoryCircles';
+import { withCategoryCircles, normalizeSiteLogo } from '../lib/categoryCircles';
 import { productPasillos, withProductPasillos } from '../lib/pasillos';
 
 export { esStockGenerico, findVariante, hasNamedVariantes, stockEstado };
@@ -693,7 +693,8 @@ const SEED_AJUSTES = {
   promoTexto: 'Centro de estética facial, corporal y bienestar | 15% en tu primera compra con código MILO15',
   newsletterEmails: [],
   categoryCircles: [],
-  categoryCirclesAlign: 'start'
+  categoryCirclesAlign: 'start',
+  logo: normalizeSiteLogo()
 };
 
 const LEGACY_PROMO = 'Bienvenida a La Burbuja de Milo | 15% en tu primera compra con código MILO15';
@@ -842,6 +843,20 @@ function circlesHavePhotos(circles) {
   return (circles || []).some((circle) => String(circle?.imagen || '').length > 20);
 }
 
+function logoSrc(logo) {
+  if (typeof logo === 'string') return logo;
+  return String(logo?.imagen || '');
+}
+
+function logoHasPhoto(logo) {
+  return logoSrc(logo).length > 20;
+}
+
+function logoHasInlinePhoto(logo) {
+  const src = logoSrc(logo);
+  return src.startsWith('data:') || src.startsWith('blob:');
+}
+
 function circlesHaveInlinePhotos(circles) {
   return (circles || []).some((circle) => {
     const src = String(circle?.imagen || '');
@@ -861,11 +876,18 @@ function mergeAjustesPreferLocal(local, remote) {
     || (localHasPhotos && !remoteHasPhotos)
     || (localHasPhotos && remoteHasPhotos && localIsNewer);
   const keepLocalPromo = localIsNewer;
+  const localLogo = normalizeSiteLogo(local.logo);
+  const remoteLogo = normalizeSiteLogo(remote.logo);
+  const keepLocalLogo = logoHasInlinePhoto(localLogo)
+    || (logoHasPhoto(localLogo) && !logoHasPhoto(remoteLogo))
+    || (logoHasPhoto(localLogo) && logoHasPhoto(remoteLogo) && localIsNewer)
+    || localIsNewer;
   return {
     ...remote,
     ...local,
     promoActivo: keepLocalPromo ? local.promoActivo : remote.promoActivo,
     promoTexto: keepLocalPromo ? (local.promoTexto || remote.promoTexto) : (remote.promoTexto || local.promoTexto),
+    logo: keepLocalLogo ? localLogo : remoteLogo,
     categoryCircles: keepLocalCircles ? localCircles : remoteCircles,
     categoryCirclesAlign: keepLocalCircles
       ? (local.categoryCirclesAlign || remote.categoryCirclesAlign)
@@ -1532,7 +1554,7 @@ export const MiloStore = {
   getAjustes: () => {
     const saved = loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES) || SEED_AJUSTES;
     const { circles, align } = withCategoryCircles(saved);
-    return { ...SEED_AJUSTES, ...saved, categoryCircles: circles, categoryCirclesAlign: align };
+    return { ...SEED_AJUSTES, ...saved, categoryCircles: circles, categoryCirclesAlign: align, logo: normalizeSiteLogo(saved.logo) };
   },
   saveAjustes: (ajustes) => {
     const current = loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES) || SEED_AJUSTES;
@@ -1541,7 +1563,8 @@ export const MiloStore = {
       ...current,
       ...ajustes,
       categoryCircles: ajustes.categoryCircles ?? current.categoryCircles,
-      categoryCirclesAlign: ajustes.categoryCirclesAlign ?? current.categoryCirclesAlign
+      categoryCirclesAlign: ajustes.categoryCirclesAlign ?? current.categoryCirclesAlign,
+      logo: normalizeSiteLogo(ajustes.logo !== undefined ? ajustes.logo : current.logo)
     };
     const { circles, align } = withCategoryCircles(merged);
     saveData(STORAGE_KEYS.AJUSTES, {

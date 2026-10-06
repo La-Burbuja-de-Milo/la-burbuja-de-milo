@@ -138,8 +138,23 @@
 .banner-motion-cascada { animation: banner-rise-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .banner-motion-revelar { animation: banner-reveal-in 800ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+@keyframes milo-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.milo-marquee-track {
+  animation: milo-marquee linear infinite;
+  will-change: transform;
+}
+
 @media (prefers-reduced-motion: reduce) {
   [class*="banner-motion-"] {
     animation: none !important;
+  }
+
+  .milo-marquee-track {
+    animation: none !important;
+    transform: none !important;
   }
 }

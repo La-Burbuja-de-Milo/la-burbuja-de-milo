@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Pause, Play, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { MiloStore } from '../../services/miloStore';
 import ProductCard from '../../components/shop/ProductCard';
 import ProductVisual from '../../components/shop/ProductVisual';
@@ -114,7 +114,53 @@ export default function LandingPage() {
       setCurrentBannerIdx((idx) => (idx + 1) % slides.length);
     }, 7000);
     return () => window.clearInterval(timer);
-  }, [paused, bannerOpen, slides.length]);
+  }, [paused, bannerOpen, slides.length, currentBannerIdx]);
+
+  const bannerGesture = useRef(null);
+
+  const isBannerControl = (target) => Boolean(target?.closest?.('button, a, input, textarea, select, label'));
+
+  const onBannerPointerDown = (event) => {
+    if (event.button && event.button !== 0) return;
+    if (isBannerControl(event.target)) return;
+    bannerGesture.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY
+    };
+  };
+
+  const onBannerPointerEnd = (event) => {
+    const start = bannerGesture.current;
+    bannerGesture.current = null;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (absX > 40 && absX > absY * 1.15) {
+      if (slides.length < 2) return;
+      setCurrentBannerIdx((idx) => (dx > 0
+        ? (idx - 1 + slides.length) % slides.length
+        : (idx + 1) % slides.length));
+      return;
+    }
+    if (absX < 12 && absY < 12) {
+      setPaused((value) => !value);
+    }
+  };
+
+  const onBannerKeyDown = (event) => {
+    if (slides.length < 2) return;
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      setCurrentBannerIdx((idx) => (idx - 1 + slides.length) % slides.length);
+    }
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      setCurrentBannerIdx((idx) => (idx + 1) % slides.length);
+    }
+  };
 
   const activeBanner = slides[currentBannerIdx] || slides[0];
   const bannerMotion = findBannerTransicion(activeBanner?.transicion).id;
@@ -155,16 +201,18 @@ export default function LandingPage() {
         </div>
       )}
 
-      <section className="relative bg-[#f4f1ea]">
-        <button
-          type="button"
-          onClick={() => setPaused((value) => !value)}
-          className="absolute right-4 top-4 z-20 border border-neutral-300 bg-white/90 p-2 dark:border-neutral-700 dark:bg-neutral-950"
-          aria-label={paused ? 'Reanudar carrusel' : 'Pausar carrusel'}
-        >
-          {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-        </button>
-
+      <section
+        className="relative touch-pan-y select-none bg-[#f4f1ea]"
+        tabIndex={0}
+        aria-roledescription="carrusel"
+        aria-label={paused
+          ? 'Banner en pausa. Toca para reanudar. Desliza para cambiar de publicación.'
+          : 'Banner. Toca para pausar. Desliza a los lados para cambiar de publicación.'}
+        onPointerDown={onBannerPointerDown}
+        onPointerUp={onBannerPointerEnd}
+        onPointerCancel={() => { bannerGesture.current = null; }}
+        onKeyDown={onBannerKeyDown}
+      >
         <EditHotspot enabled={canEditCatalog} onEdit={() => openBanner(activeBanner)} className="block">
         <div className="mx-auto grid max-w-[1440px] lg:min-h-[72vh] lg:grid-cols-2 lg:items-stretch">
           <div
@@ -197,35 +245,40 @@ export default function LandingPage() {
               </button>
             </div>
           </div>
-          <div
-            key={`photo-${activeBanner.id}-${currentBannerIdx}`}
-            className={`order-1 lg:order-2 ${BANNER_PHOTO_SLOT_CLASS} ${bannerMatClass(activeBanner)}`}
-          >
-            <BannerStage banner={activeBanner} className="absolute inset-0" />
+          <div className={`order-1 lg:order-2 ${BANNER_PHOTO_SLOT_CLASS} ${bannerMatClass(activeBanner)}`}>
+            <div
+              key={`photo-${activeBanner.id}-${currentBannerIdx}`}
+              className="absolute inset-0"
+            >
+              <BannerStage banner={activeBanner} className="absolute inset-0" />
+            </div>
+            {slides.length > 1 ? (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center bg-gradient-to-t from-black/40 to-transparent pb-3 pt-10">
+                <div className="pointer-events-auto flex items-center gap-1.5" role="tablist" aria-label="Publicaciones del banner">
+                  {slides.map((slide, index) => {
+                    const current = index === currentBannerIdx;
+                    return (
+                      <button
+                        key={slide.id || index}
+                        type="button"
+                        role="tab"
+                        aria-label={`Publicación ${index + 1} de ${slides.length}`}
+                        aria-selected={current}
+                        onClick={() => setCurrentBannerIdx(index)}
+                        className={`rounded-full transition-[width,background-color] duration-300 ${
+                          current
+                            ? 'h-1.5 w-5 bg-white'
+                            : 'h-1.5 w-1.5 bg-white/55 hover:bg-white/80'
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
         </EditHotspot>
-
-        {slides.length > 1 && (
-          <>
-            <button
-              type="button"
-              aria-label="Banner anterior"
-              onClick={() => setCurrentBannerIdx((idx) => (idx - 1 + slides.length) % slides.length)}
-              className="absolute left-3 top-1/2 z-20 -translate-y-1/2 bg-white p-3 shadow-sm dark:bg-neutral-950"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              aria-label="Banner siguiente"
-              onClick={() => setCurrentBannerIdx((idx) => (idx + 1) % slides.length)}
-              className="absolute right-3 top-1/2 z-20 -translate-y-1/2 bg-white p-3 shadow-sm dark:bg-neutral-950"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </>
-        )}
       </section>
 
       <section className="border-b border-neutral-200 bg-neutral-950 px-5 py-8 text-white lg:px-16">

@@ -86,6 +86,19 @@ export function panCropPosition({ posX, posY, dxPct, dyPct, widthPct, heightPct 
   };
 }
 
+export function normalizeSiteLogo(value) {
+  const raw = typeof value === 'string' ? { imagen: value } : (value && typeof value === 'object' ? value : {});
+  return {
+    imagen: raw.imagen || '',
+    posX: clampCircleValue(raw.posX, 0, 100, 50),
+    posY: clampCircleValue(raw.posY, 0, 100, 50),
+    zoom: clampCircleValue(raw.zoom, CIRCLE_ZOOM_MIN, CIRCLE_ZOOM_MAX, 1),
+    flipX: Boolean(raw.flipX),
+    flipY: Boolean(raw.flipY),
+    rotate: normalizeRotate(raw.rotate)
+  };
+}
+
 export function normalizeCategoryCircle(item, fallback) {
   const base = fallback || DEFAULT_CATEGORY_CIRCLES[0];
   return {

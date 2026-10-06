@@ -61,7 +61,8 @@ export default function ProductVisual({
   flipY = false,
   rotate = 0,
   focalCrop = false,
-  clip = true
+  clip = true,
+  mat = 'auto'
 }) {
   const [measured, setMeasured] = useState({ src, ratio: null });
   const boxRef = useRef(null);
@@ -71,8 +72,10 @@ export default function ProductVisual({
   }
   const ratio = measured.src === src ? measured.ratio : null;
   const png = isPngSource(src);
-  const photoBg = png ? 'bg-white' : 'bg-[#efeae2]';
-  const photoStyle = png ? { backgroundColor: '#ffffff' } : undefined;
+  const whiteMat = mat === 'white' || png;
+  const photoBg = whiteMat ? 'bg-white' : 'bg-[#efeae2]';
+  const photoStyle = whiteMat ? { backgroundColor: '#ffffff' } : undefined;
+  const needsTransform = Boolean(flipX || flipY || rotate);
 
   useEffect(() => {
     if (!focalCrop) return undefined;
@@ -94,10 +97,12 @@ export default function ProductVisual({
       <div ref={boxRef} className={`relative ${photoBg} ${clip ? 'overflow-hidden' : 'overflow-visible'} ${className}`} style={photoStyle}>
         <div
           className="absolute inset-0"
-          style={{
-            transform: circleImageTransform({ flipX, flipY, rotate }),
-            transformOrigin: 'center center'
-          }}
+          style={needsTransform
+            ? {
+                transform: circleImageTransform({ flipX, flipY, rotate }),
+                transformOrigin: 'center center'
+              }
+            : undefined}
         >
           <img
             src={src}

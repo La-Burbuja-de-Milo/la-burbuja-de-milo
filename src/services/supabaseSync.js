@@ -1,6 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { withProductPasillos, productPasillos } from '../lib/pasillos';
 import { bannerFotoSrc, cloneBanner, normalizeBannerFoto } from '../lib/bannerFrames';
+import { normalizeSiteLogo } from '../lib/categoryCircles';
 
 const KEYS = {
   BANNERS: 'milo_banners',
@@ -318,6 +319,7 @@ export function mapAjustesFromDb(row) {
     categoryCircles: Array.isArray(row.category_circles) ? row.category_circles : [],
     categoryCirclesAlign: row.category_circles_align || 'start',
     newsletterEmails: Array.isArray(row.newsletter_emails) ? row.newsletter_emails : [],
+    logo: normalizeSiteLogo(row.logo),
     updatedAt: row.updated_at || null
   };
 }
@@ -329,7 +331,8 @@ function mapAjustesToDb(ajustes) {
     promo_texto: ajustes?.promoTexto || null,
     category_circles: Array.isArray(ajustes?.categoryCircles) ? ajustes.categoryCircles : [],
     category_circles_align: ajustes?.categoryCirclesAlign || 'start',
-    newsletter_emails: Array.isArray(ajustes?.newsletterEmails) ? ajustes.newsletterEmails : []
+    newsletter_emails: Array.isArray(ajustes?.newsletterEmails) ? ajustes.newsletterEmails : [],
+    logo: normalizeSiteLogo(ajustes?.logo)
   };
 }
 
@@ -407,7 +410,11 @@ async function persistAjustesImages(ajustes) {
       : circle?.imagen;
     categoryCircles.push({ ...circle, imagen });
   }
-  return { ...ajustes, categoryCircles };
+  const logo = normalizeSiteLogo(ajustes?.logo);
+  const logoImagen = logo.imagen
+    ? await uploadVitrinaAsset('brand/logo', logo.imagen)
+    : logo.imagen;
+  return { ...ajustes, categoryCircles, logo: { ...logo, imagen: logoImagen } };
 }
 
 function friendlySyncError(label, error) {
@@ -423,8 +430,16 @@ function friendlySyncError(label, error) {
 
 async function upsertAjustes(ajustes) {
   if (!supabase || !ajustes) return;
-  const { error } = await supabase.from('ajustes').upsert(mapAjustesToDb(ajustes));
-  if (error) throw error;
+  const payload = mapAjustesToDb(ajustes);
+  const { error } = await supabase.from('ajustes').upsert(payload);
+  if (!error) return;
+  if (/logo/i.test(error.message || '')) {
+    const { logo: _logo, ...rest } = payload;
+    const { error: retry } = await supabase.from('ajustes').upsert(rest);
+    if (retry) throw retry;
+    return;
+  }
+  throw error;
 }
 
 function mapMovimientoToDb(movimiento) {
