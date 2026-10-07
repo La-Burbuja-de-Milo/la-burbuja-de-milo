@@ -19,10 +19,10 @@ import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
 import { withEditParam } from '../../lib/visualEdit';
 import { formatCOP } from '../../lib/money';
 
-function SectionHeader({ title, tabs, activeTab, onTab, actionLabel, onAction, align = 'center', editable, onEdit }) {
+function SectionHeader({ title, tabs, activeTab, onTab, actionLabel, onAction, align = 'center', centered, editable, onEdit }) {
   const body = (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
-      <div className={`flex items-end ${tabs ? `hide-scrollbar min-w-0 flex-nowrap gap-2.5 overflow-x-auto sm:flex-1 sm:gap-5 ${tabRowClass(align)}` : 'flex-wrap gap-5'}`}>
+    <div className={`mb-6 flex flex-col gap-3 ${centered ? 'items-center text-center' : 'sm:flex-row sm:items-end sm:gap-4'}`}>
+      <div className={`flex items-end ${tabs ? `hide-scrollbar min-w-0 flex-nowrap gap-2.5 overflow-x-auto sm:flex-1 sm:gap-5 ${tabRowClass(align)}` : centered ? 'justify-center' : 'flex-wrap gap-5'}`}>
         {tabs ? (
           tabs.map((tab) => (
             <button
@@ -46,7 +46,7 @@ function SectionHeader({ title, tabs, activeTab, onTab, actionLabel, onAction, a
         <button
           type="button"
           onClick={onAction}
-          className={`shrink-0 text-sm font-medium underline-offset-4 hover:underline ${homeTabRowActionClass(align)}`}
+          className={`shrink-0 text-sm font-medium underline-offset-4 hover:underline ${centered ? '' : homeTabRowActionClass(align)}`}
         >
           {actionLabel}
         </button>
@@ -64,7 +64,7 @@ function SectionHeader({ title, tabs, activeTab, onTab, actionLabel, onAction, a
 export default function LandingPage() {
   const navigate = useNavigate();
   const { canEditCatalog } = useVisualEdit();
-  const { openBanner, openProduct, openServicio, openBlog, openCategoryCircles, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, bannerOpen } = useCmsEdit();
+  const { openBanner, openProduct, openServicio, openCategoryCircles, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, bannerOpen } = useCmsEdit();
   const go = (to) => navigate(canEditCatalog ? withEditParam(to) : to);
   const [banners, setBanners] = useState([]);
   const [currentBannerIdx, setCurrentBannerIdx] = useState(0);
@@ -74,7 +74,6 @@ export default function LandingPage() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedVarianteId, setSelectedVarianteId] = useState('');
   const [servicios, setServicios] = useState([]);
-  const [blogPosts, setBlogPosts] = useState([]);
   const [productTab, setProductTab] = useState('bestsellers');
   const [picksTab, setPicksTab] = useState('cabina');
   const [notice, setNotice] = useState('');
@@ -92,11 +91,6 @@ export default function LandingPage() {
     const ajustes = MiloStore.getAjustes();
     const allServicios = MiloStore.getServicios();
     setServicios(pickFeaturedServicios(allServicios, withHomeTabRows(ajustes).picks.servicioIds));
-    const posts = MiloStore.getBlogPosts();
-    const featuredPosts = ['post-4', 'post-5', 'post-1']
-      .map((id) => posts.find((post) => post.id === id))
-      .filter(Boolean);
-    setBlogPosts((featuredPosts.length ? featuredPosts : posts).slice(0, 3));
     setCategoryCircles(withCategoryCircles(ajustes));
     setRewardsStrip(normalizeRewardsStrip(ajustes.rewardsStrip));
     setHomeTabRows(withHomeTabRows(ajustes));
@@ -440,6 +434,7 @@ export default function LandingPage() {
             title={homeStory.pasillos.title}
             actionLabel={homeStory.pasillos.actionLabel}
             onAction={() => go(homeStory.pasillos.actionTo || '/tienda')}
+            centered
             editable={canEditCatalog}
             onEdit={openHomePasillos}
           />
@@ -529,9 +524,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-[1440px] gap-8 px-5 py-8 lg:grid-cols-3 lg:px-16">
-        <EditHotspot enabled={canEditCatalog} onEdit={openHomeEstetica} label="Editar bloque" tone="light" placement="left" className="lg:col-span-1">
-          <article className="h-full bg-neutral-950 p-8 text-white lg:col-span-1">
+      <section className="mx-auto max-w-[1440px] px-5 py-8 lg:px-16">
+        <EditHotspot enabled={canEditCatalog} onEdit={openHomeEstetica} label="Editar bloque" tone="light" placement="left">
+          <article className="bg-neutral-950 p-8 text-white">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/60">{homeStory.estetica.tag}</p>
             <h2 className="mt-4 text-2xl font-medium">{homeStory.estetica.title}</h2>
             <p className="mt-4 text-sm leading-relaxed text-white/75">
@@ -539,24 +534,6 @@ export default function LandingPage() {
             </p>
           </article>
         </EditHotspot>
-        <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
-          {blogPosts.map((post) => (
-            <EditHotspot key={post.id} enabled={canEditCatalog} onEdit={() => openBlog(post)}>
-            <button
-              type="button"
-              onClick={() => go('/blog')}
-              className="border border-neutral-200 p-0 text-left hover:border-neutral-900 dark:border-neutral-700 dark:hover:border-white"
-            >
-              <ProductVisual {...visualCropProps(post)} className="h-36 w-full" />
-              <div className="p-5">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{post.categoria}</p>
-              <h3 className="mt-2 text-base font-medium text-neutral-900 dark:text-white">{post.titulo}</h3>
-              <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{post.resumen}</p>
-              </div>
-            </button>
-            </EditHotspot>
-          ))}
-        </div>
       </section>
 
       <section className="mt-8 bg-neutral-100 px-5 py-12">
