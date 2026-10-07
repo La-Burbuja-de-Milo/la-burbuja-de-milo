@@ -64,9 +64,19 @@ function MenuSplitItem({ to, hrefFor, label, open, onToggle, children }) {
   return (
     <li>
       <div className="flex items-center gap-1">
-        <Link to={hrefFor(to)} className="min-w-0 flex-1 py-1 text-left text-sm font-medium text-white">
-          {label}
-        </Link>
+        {to ? (
+          <Link to={hrefFor(to)} className="min-w-0 flex-1 py-1 text-left text-sm font-medium text-white">
+            {label}
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggle}
+            className="min-w-0 flex-1 py-1 text-left text-sm font-medium text-white"
+          >
+            {label}
+          </button>
+        )}
         <button
           type="button"
           aria-expanded={open}
@@ -593,6 +603,7 @@ function AppChrome() {
                 onToggle={() => {
                   setTiendaMenuOpen((open) => !open);
                   setMarcasMenuOpen(false);
+                  setCabinaMenuOpen(false);
                 }}
               >
                 <ul className="mt-2 ml-3 flex flex-col gap-2 border-l border-white/20 pl-3">
@@ -606,31 +617,29 @@ function AppChrome() {
                       </Link>
                     </li>
                   ))}
-                  <li>
-                    <button
-                      type="button"
-                      aria-expanded={marcasMenuOpen}
-                      onClick={() => setMarcasMenuOpen((open) => !open)}
-                      className="flex w-full items-center justify-between py-0.5 text-left text-sm font-medium text-white/80"
-                    >
-                      Marcas
-                      <ChevronDown className={`h-4 w-4 shrink-0 text-white/50 transition-transform ${marcasMenuOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                    {marcasMenuOpen ? (
-                      <ul className="mt-2 ml-3 flex flex-col gap-2 border-l border-white/15 pl-3">
-                        {marcas.map((marca) => (
-                          <li key={marca.id}>
-                            <Link
-                              to={hrefFor(`/tienda?marca=${encodeURIComponent(String(marca.nombre || '').toLowerCase())}`)}
-                              className="block py-0.5 text-sm font-medium text-white/70"
-                            >
-                              {marca.nombre}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </li>
+                </ul>
+              </MenuSplitItem>
+              <MenuSplitItem
+                hrefFor={hrefFor}
+                label="Marcas"
+                open={marcasMenuOpen}
+                onToggle={() => {
+                  setMarcasMenuOpen((open) => !open);
+                  setTiendaMenuOpen(false);
+                  setCabinaMenuOpen(false);
+                }}
+              >
+                <ul className="mt-2 ml-3 flex flex-col gap-2 border-l border-white/20 pl-3">
+                  {marcas.map((marca) => (
+                    <li key={marca.id}>
+                      <Link
+                        to={hrefFor(`/tienda?marca=${encodeURIComponent(String(marca.nombre || '').toLowerCase())}`)}
+                        className="block py-0.5 text-sm font-medium text-white/80"
+                      >
+                        {marca.nombre}
+                      </Link>
+                    </li>
+                  ))}
                 </ul>
               </MenuSplitItem>
               <MenuSplitItem
@@ -638,7 +647,11 @@ function AppChrome() {
                 hrefFor={hrefFor}
                 label="Cabina"
                 open={cabinaMenuOpen}
-                onToggle={() => setCabinaMenuOpen((open) => !open)}
+                onToggle={() => {
+                  setCabinaMenuOpen((open) => !open);
+                  setTiendaMenuOpen(false);
+                  setMarcasMenuOpen(false);
+                }}
               >
                 <ul className="mt-2 ml-3 flex flex-col gap-2 border-l border-white/20 pl-3">
                   <li>
