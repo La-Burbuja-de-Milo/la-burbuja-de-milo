@@ -5,6 +5,7 @@ import ProductVisual from '../../components/shop/ProductVisual';
 import { X, ArrowRight } from 'lucide-react';
 import EditHotspot from '../../components/admin/EditHotspot';
 import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
+import { visualCropProps } from '../../lib/mediaCrop';
 
 export default function BlogPage() {
   const [posts, setPosts] = useState([]);
@@ -60,7 +61,7 @@ export default function BlogPage() {
             onClick={() => setSelectedPost(post)}
             className="group flex w-full flex-col text-left"
           >
-            <ProductVisual seed={post.id} src={post.imagen} variant="hero" className="h-52 w-full" />
+            <ProductVisual {...visualCropProps(post)} variant="hero" className="h-52 w-full" />
             <p className="mt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
               {post.categoria}
             </p>
@@ -90,7 +91,7 @@ export default function BlogPage() {
             >
               <X className="h-4 w-4" />
             </button>
-            <ProductVisual seed={selectedPost.id} src={selectedPost.imagen} variant="hero" className="mb-5 h-48 w-full" />
+            <ProductVisual {...visualCropProps(selectedPost)} variant="hero" className="mb-5 h-48 w-full" />
             {canEditCatalog && (
               <button
                 type="button"

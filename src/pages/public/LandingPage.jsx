@@ -10,8 +10,9 @@ import { BANNER_PHOTO_SLOT_CLASS, bannerMatClass, findBannerTransicion } from '.
 import { categoryRowClass, withCategoryCircles } from '../../lib/categoryCircles';
 import { productInPasillo } from '../../lib/pasillos';
 import { normalizeRewardsStrip } from '../../lib/rewardsStrip';
-import { homeTabRowActionClass, tabRowClass, withHomeTabRows } from '../../lib/homeTabRows';
+import { homeTabRowActionClass, pickFeaturedServicios, tabRowClass, withHomeTabRows } from '../../lib/homeTabRows';
 import { storyCardVisualProps, withHomeStory } from '../../lib/homeStory';
+import { visualCropProps } from '../../lib/mediaCrop';
 import EditHotspot from '../../components/admin/EditHotspot';
 import RewardsStrip from '../../components/shop/RewardsStrip';
 import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
@@ -88,23 +89,14 @@ export default function LandingPage() {
     setBanners(MiloStore.getBanners().filter((banner) => banner.activo));
     setProductos(MiloStore.getProductos());
     setPasillos(MiloStore.getPasillos());
+    const ajustes = MiloStore.getAjustes();
     const allServicios = MiloStore.getServicios();
-    const featured = [];
-    ['Diagnóstico', 'Facial', 'Corporal', 'Bienestar'].forEach((categoria) => {
-      const match = allServicios.find((item) => item.categoria === categoria && !featured.includes(item));
-      if (match) featured.push(match);
-    });
-    allServicios.forEach((item) => {
-      if (featured.length >= 4 || featured.includes(item)) return;
-      featured.push(item);
-    });
-    setServicios(featured.slice(0, 4));
+    setServicios(pickFeaturedServicios(allServicios, withHomeTabRows(ajustes).picks.servicioIds));
     const posts = MiloStore.getBlogPosts();
     const featuredPosts = ['post-4', 'post-5', 'post-1']
       .map((id) => posts.find((post) => post.id === id))
       .filter(Boolean);
     setBlogPosts((featuredPosts.length ? featuredPosts : posts).slice(0, 3));
-    const ajustes = MiloStore.getAjustes();
     setCategoryCircles(withCategoryCircles(ajustes));
     setRewardsStrip(normalizeRewardsStrip(ajustes.rewardsStrip));
     setHomeTabRows(withHomeTabRows(ajustes));
@@ -370,8 +362,15 @@ export default function LandingPage() {
           align={homeTabRows.products.align}
           activeTab={productTab}
           onTab={setProductTab}
-          actionLabel="Shop all"
-          onAction={() => go(productTab === 'camino' ? '/tienda?filtro=en-camino' : '/tienda')}
+          actionLabel={homeTabRows.products.actionLabel}
+          onAction={() => {
+            const to = homeTabRows.products.actionTo || '/tienda';
+            if (productTab === 'camino' && (to === '/tienda' || to === '/tienda/')) {
+              go('/tienda?filtro=en-camino');
+              return;
+            }
+            go(to);
+          }}
           editable={canEditCatalog}
           onEdit={openHomeTabs}
         />
@@ -393,8 +392,8 @@ export default function LandingPage() {
           align={homeTabRows.picks.align}
           activeTab={picksTab}
           onTab={setPicksTab}
-          actionLabel="Ver agenda"
-          onAction={() => go('/citas')}
+          actionLabel={homeTabRows.picks.actionLabel}
+          onAction={() => go(homeTabRows.picks.actionTo || '/citas')}
           editable={canEditCatalog}
           onEdit={openHomeTabs}
         />
@@ -403,7 +402,7 @@ export default function LandingPage() {
             {servicios.map((servicio) => (
               <EditHotspot key={servicio.id} enabled={canEditCatalog} onEdit={() => openServicio(servicio)} className="h-full">
               <article className="flex h-full min-h-0 flex-col border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-950">
-                <ProductVisual seed={servicio.id} src={servicio.imagen} className="h-48 w-full shrink-0" />
+                <ProductVisual {...visualCropProps(servicio)} className="h-48 w-full shrink-0" />
                 <div className="flex flex-1 flex-col p-4">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{servicio.categoria}</p>
                   <h3 className="mt-2 line-clamp-2 min-h-[2.75rem] text-base font-medium leading-snug text-neutral-900 dark:text-white">{servicio.titulo}</h3>
@@ -513,7 +512,7 @@ export default function LandingPage() {
             <EditHotspot key={product.id} enabled={canEditCatalog} onEdit={() => openProduct(product)}>
             <article className="flex flex-col">
               <button type="button" onClick={() => openProductDetail(product)} className="text-left">
-                <ProductVisual seed={`${product.id}-editorial`} src={product.imagen} variant="hero" className="h-64 w-full" />
+                <ProductVisual {...visualCropProps(product, { seed: `${product.id}-editorial` })} variant="hero" className="h-64 w-full" />
                 <h3 className="mt-4 text-xl font-medium text-neutral-900 dark:text-white">{product.nombre}</h3>
                 <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{product.descripcion}</p>
               </button>
@@ -548,7 +547,7 @@ export default function LandingPage() {
               onClick={() => go('/blog')}
               className="border border-neutral-200 p-0 text-left hover:border-neutral-900 dark:border-neutral-700 dark:hover:border-white"
             >
-              <ProductVisual seed={post.id} src={post.imagen} className="h-36 w-full" />
+              <ProductVisual {...visualCropProps(post)} className="h-36 w-full" />
               <div className="p-5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{post.categoria}</p>
               <h3 className="mt-2 text-base font-medium text-neutral-900 dark:text-white">{post.titulo}</h3>

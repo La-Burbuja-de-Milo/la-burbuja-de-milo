@@ -5,6 +5,8 @@ import { normalizeSiteLogo } from '../lib/categoryCircles';
 import { normalizeRewardsStrip } from '../lib/rewardsStrip';
 import { withHomeTabRows } from '../lib/homeTabRows';
 import { withHomeStory } from '../lib/homeStory';
+import { withMediaCrops } from '../lib/mediaCrop';
+import { withTiendaPage } from '../lib/tiendaPage';
 import { logoWithCms, pickCmsValue, siteCmsFromAjustes, siteCmsFromLogo } from '../lib/siteCms';
 
 const KEYS = {
@@ -331,6 +333,8 @@ export function mapAjustesFromDb(row) {
     rewardsStrip: normalizeRewardsStrip(pickCmsValue(row.rewards_strip, cms.rewardsStrip)),
     homeTabRows: withHomeTabRows(pickCmsValue(row.home_tab_rows, cms.homeTabRows)),
     homeStory: withHomeStory(pickCmsValue(row.home_story, cms.homeStory)),
+    mediaCrops: withMediaCrops(pickCmsValue(row.media_crops, cms.mediaCrops)),
+    tiendaPage: withTiendaPage(pickCmsValue(row.tienda_page, cms.tiendaPage)),
     updatedAt: row.updated_at || null
   };
 }
@@ -347,7 +351,9 @@ function mapAjustesToDb(ajustes) {
     logo: logoWithCms(ajustes?.logo, cms),
     rewards_strip: cms.rewardsStrip,
     home_tab_rows: cms.homeTabRows,
-    home_story: cms.homeStory
+    home_story: cms.homeStory,
+    media_crops: cms.mediaCrops,
+    tienda_page: cms.tiendaPage
   };
 }
 

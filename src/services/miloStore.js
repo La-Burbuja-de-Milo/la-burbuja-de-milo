@@ -10,7 +10,9 @@ import { withCategoryCircles, normalizeSiteLogo } from '../lib/categoryCircles';
 import { normalizeRewardsStrip } from '../lib/rewardsStrip';
 import { withHomeTabRows } from '../lib/homeTabRows';
 import { storyCardsHaveInlinePhotos, storyCardsHavePhotos, withHomeStory } from '../lib/homeStory';
-import { productPasillos, withProductPasillos } from '../lib/pasillos';
+import { applyMediaCrops, collectMediaCrops, mediaCropsHaveValues, withMediaCrops } from '../lib/mediaCrop';
+import { withTiendaPage } from '../lib/tiendaPage';
+import { productPasillos, shopPasillos, withProductPasillos } from '../lib/pasillos';
 
 export { esStockGenerico, findVariante, hasNamedVariantes, stockEstado };
 
@@ -36,8 +38,7 @@ export const PASILLO_OPTIONS = [
   { id: 'corporal', nombre: 'Estética corporal' },
   { id: 'capilar', nombre: 'Cuidado capilar' },
   { id: 'bienestar', nombre: 'Bienestar y nutrición' },
-  { id: 'nutricosmetica', nombre: 'Nutricosmética' },
-  { id: 'tratamientos', nombre: 'Protocolos de cabina' }
+  { id: 'nutricosmetica', nombre: 'Nutricosmética' }
 ];
 
 const SEED_MARCAS = [
@@ -134,8 +135,7 @@ const SEED_PASILLOS = [
   { id: 'corporal', nombre: 'Estética corporal', icon: 'Heart' },
   { id: 'capilar', nombre: 'Cuidado capilar', icon: 'Wind' },
   { id: 'bienestar', nombre: 'Bienestar y nutrición', icon: 'Leaf' },
-  { id: 'nutricosmetica', nombre: 'Nutricosmética', icon: 'ShieldCheck' },
-  { id: 'tratamientos', nombre: 'Protocolos de cabina', icon: 'CalendarHeart' }
+  { id: 'nutricosmetica', nombre: 'Nutricosmética', icon: 'ShieldCheck' }
 ];
 
 const SEED_PRODUCTOS = [
@@ -700,7 +700,9 @@ const SEED_AJUSTES = {
   logo: normalizeSiteLogo(),
   rewardsStrip: normalizeRewardsStrip(),
   homeTabRows: withHomeTabRows(),
-  homeStory: withHomeStory()
+  homeStory: withHomeStory(),
+  mediaCrops: {},
+  tiendaPage: withTiendaPage()
 };
 
 const LEGACY_PROMO = 'Bienvenida a La Burbuja de Milo | 15% en tu primera compra con código MILO15';
@@ -893,11 +895,18 @@ function mergeAjustesPreferLocal(local, remote) {
   const localTabs = local.homeTabRows && typeof local.homeTabRows === 'object';
   const remoteTabs = remote.homeTabRows && typeof remote.homeTabRows === 'object';
   const keepLocalHomeTabs = (localTabs && !remoteTabs) || (localTabs && remoteTabs && localIsNewer);
+  const localTiendaPage = local.tiendaPage && typeof local.tiendaPage === 'object';
+  const remoteTiendaPage = remote.tiendaPage && typeof remote.tiendaPage === 'object';
+  const keepLocalTiendaPage = (localTiendaPage && !remoteTiendaPage) || (localTiendaPage && remoteTiendaPage && localIsNewer);
   const localStory = withHomeStory(local);
   const remoteStory = withHomeStory(remote);
   const keepLocalStory = storyCardsHaveInlinePhotos(localStory)
     || (storyCardsHavePhotos(localStory) && !storyCardsHavePhotos(remoteStory))
     || ((local.homeStory && remote.homeStory && localIsNewer) || (local.homeStory && !remote.homeStory));
+  const localCrops = withMediaCrops(local);
+  const remoteCrops = withMediaCrops(remote);
+  const keepLocalCrops = (mediaCropsHaveValues(localCrops) && !mediaCropsHaveValues(remoteCrops))
+    || (mediaCropsHaveValues(localCrops) && mediaCropsHaveValues(remoteCrops) && localIsNewer);
   return {
     ...remote,
     ...local,
@@ -907,6 +916,8 @@ function mergeAjustesPreferLocal(local, remote) {
     rewardsStrip: normalizeRewardsStrip(keepLocalRewardsStrip ? local.rewardsStrip : remote.rewardsStrip),
     homeTabRows: withHomeTabRows(keepLocalHomeTabs ? local : remote),
     homeStory: withHomeStory(keepLocalStory ? local : remote),
+    tiendaPage: withTiendaPage(keepLocalTiendaPage ? local : remote),
+    mediaCrops: keepLocalCrops ? localCrops : (mediaCropsHaveValues(remoteCrops) ? remoteCrops : localCrops),
     categoryCircles: keepLocalCircles ? localCircles : remoteCircles,
     categoryCirclesAlign: keepLocalCircles
       ? (local.categoryCirclesAlign || remote.categoryCirclesAlign)
@@ -976,6 +987,20 @@ function saveData(key, data, { sync = true } = {}) {
   } catch (err) {
     console.error(`Error al guardar ${key} en localStorage:`, err);
   }
+}
+
+function persistMediaCrops() {
+  const ajustes = loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES) || SEED_AJUSTES;
+  const packed = withMediaCrops(ajustes);
+  saveData(STORAGE_KEYS.AJUSTES, {
+    ...ajustes,
+    mediaCrops: collectMediaCrops({
+      productos: applyMediaCrops(loadData(STORAGE_KEYS.PRODUCTOS, SEED_PRODUCTOS), 'producto', packed),
+      servicios: applyMediaCrops(loadData(STORAGE_KEYS.SERVICIOS, SEED_SERVICIOS), 'servicio', packed),
+      blog: applyMediaCrops(loadData(STORAGE_KEYS.BLOG, SEED_BLOG), 'blog', packed)
+    }),
+    updatedAt: stampNow()
+  });
 }
 
 function makeMovimiento({
@@ -1088,8 +1113,8 @@ export const MiloStore = {
   },
 
   // === PASILLOS ===
-  getPasillos: () => loadData(STORAGE_KEYS.PASILLOS, SEED_PASILLOS),
-  savePasillos: (pasillos) => saveData(STORAGE_KEYS.PASILLOS, pasillos),
+  getPasillos: () => shopPasillos(loadData(STORAGE_KEYS.PASILLOS, SEED_PASILLOS)),
+  savePasillos: (pasillos) => saveData(STORAGE_KEYS.PASILLOS, shopPasillos(pasillos)),
   addPasillo: (pasillo) => {
     const current = MiloStore.getPasillos();
     const id = slugify(pasillo.nombre);
@@ -1168,8 +1193,15 @@ export const MiloStore = {
   },
 
   // === PRODUCTOS ===
-  getProductos: () => loadData(STORAGE_KEYS.PRODUCTOS, SEED_PRODUCTOS).map(withProductPasillos),
-  saveProductos: (productos) => saveData(STORAGE_KEYS.PRODUCTOS, productos),
+  getProductos: () => applyMediaCrops(
+    loadData(STORAGE_KEYS.PRODUCTOS, SEED_PRODUCTOS).map(withProductPasillos),
+    'producto',
+    withMediaCrops(loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES))
+  ),
+  saveProductos: (productos) => {
+    saveData(STORAGE_KEYS.PRODUCTOS, productos);
+    persistMediaCrops();
+  },
   addProducto: (prod) => {
     const movimientosPrevios = ensureMovimientos();
     const current = MiloStore.getProductos();
@@ -1299,8 +1331,15 @@ export const MiloStore = {
   },
 
   // === SERVICIOS ESTÉTICOS ===
-  getServicios: () => loadData(STORAGE_KEYS.SERVICIOS, SEED_SERVICIOS),
-  saveServicios: (servicios) => saveData(STORAGE_KEYS.SERVICIOS, servicios),
+  getServicios: () => applyMediaCrops(
+    loadData(STORAGE_KEYS.SERVICIOS, SEED_SERVICIOS),
+    'servicio',
+    withMediaCrops(loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES))
+  ),
+  saveServicios: (servicios) => {
+    saveData(STORAGE_KEYS.SERVICIOS, servicios);
+    persistMediaCrops();
+  },
   addServicio: (srv) => {
     const current = MiloStore.getServicios();
     const nuevo = {
@@ -1393,8 +1432,15 @@ export const MiloStore = {
   },
 
   // === BLOG ===
-  getBlogPosts: () => loadData(STORAGE_KEYS.BLOG, SEED_BLOG),
-  saveBlogPosts: (posts) => saveData(STORAGE_KEYS.BLOG, posts),
+  getBlogPosts: () => applyMediaCrops(
+    loadData(STORAGE_KEYS.BLOG, SEED_BLOG),
+    'blog',
+    withMediaCrops(loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES))
+  ),
+  saveBlogPosts: (posts) => {
+    saveData(STORAGE_KEYS.BLOG, posts);
+    persistMediaCrops();
+  },
   addBlogPost: (post) => {
     const current = MiloStore.getBlogPosts();
     const newPost = {
@@ -1573,7 +1619,7 @@ export const MiloStore = {
   getAjustes: () => {
     const saved = loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES) || SEED_AJUSTES;
     const { circles, align } = withCategoryCircles(saved);
-    return { ...SEED_AJUSTES, ...saved, categoryCircles: circles, categoryCirclesAlign: align, logo: normalizeSiteLogo(saved.logo), rewardsStrip: normalizeRewardsStrip(saved.rewardsStrip), homeTabRows: withHomeTabRows(saved), homeStory: withHomeStory(saved) };
+    return { ...SEED_AJUSTES, ...saved, categoryCircles: circles, categoryCirclesAlign: align, logo: normalizeSiteLogo(saved.logo), rewardsStrip: normalizeRewardsStrip(saved.rewardsStrip), homeTabRows: withHomeTabRows(saved), homeStory: withHomeStory(saved), mediaCrops: withMediaCrops(saved), tiendaPage: withTiendaPage(saved) };
   },
   saveAjustes: (ajustes) => {
     const current = loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES) || SEED_AJUSTES;
@@ -1586,7 +1632,9 @@ export const MiloStore = {
       logo: normalizeSiteLogo(ajustes.logo !== undefined ? ajustes.logo : current.logo),
       rewardsStrip: normalizeRewardsStrip(ajustes.rewardsStrip !== undefined ? ajustes.rewardsStrip : current.rewardsStrip),
       homeTabRows: withHomeTabRows(ajustes.homeTabRows !== undefined ? ajustes : current),
-      homeStory: withHomeStory(ajustes.homeStory !== undefined ? ajustes : current)
+      homeStory: withHomeStory(ajustes.homeStory !== undefined ? ajustes : current),
+      mediaCrops: withMediaCrops(ajustes.mediaCrops !== undefined ? ajustes : current),
+      tiendaPage: withTiendaPage(ajustes.tiendaPage !== undefined ? ajustes : current)
     };
     const { circles, align } = withCategoryCircles(merged);
     saveData(STORAGE_KEYS.AJUSTES, {
@@ -1623,12 +1671,22 @@ export const MiloStore = {
     window.location.reload();
   },
 
-  publishCatalog: () => publishCatalogToSupabase({
-    banners: loadData(STORAGE_KEYS.BANNERS, SEED_BANNERS).map(cloneBanner),
-    ajustes: MiloStore.getAjustes(),
-    persistLocal: ({ banners, ajustes }) => {
-      saveData(STORAGE_KEYS.BANNERS, (banners || []).map(cloneBanner), { sync: false });
-      saveData(STORAGE_KEYS.AJUSTES, ajustes, { sync: false });
-    }
-  })
+  publishCatalog: () => {
+    const ajustes = MiloStore.getAjustes();
+    return publishCatalogToSupabase({
+      banners: loadData(STORAGE_KEYS.BANNERS, SEED_BANNERS).map(cloneBanner),
+      ajustes: {
+        ...ajustes,
+        mediaCrops: collectMediaCrops({
+          productos: MiloStore.getProductos(),
+          servicios: MiloStore.getServicios(),
+          blog: MiloStore.getBlogPosts()
+        })
+      },
+      persistLocal: ({ banners, ajustes: nextAjustes }) => {
+        saveData(STORAGE_KEYS.BANNERS, (banners || []).map(cloneBanner), { sync: false });
+        saveData(STORAGE_KEYS.AJUSTES, nextAjustes, { sync: false });
+      }
+    });
+  }
 };

@@ -3,15 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 import { MiloStore } from '../../services/miloStore';
 import ProductCard from '../../components/shop/ProductCard';
 import ProductDetail, { pickVarianteId } from '../../components/shop/ProductDetail';
-import { Clock, ShoppingBag, Check } from 'lucide-react';
+import { ShoppingBag, Check } from 'lucide-react';
 import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
+import EditHotspot from '../../components/admin/EditHotspot';
 import { findVariante } from '../../lib/variantes';
 import { productInPasillo, productPasillos } from '../../lib/pasillos';
+import { withTiendaPage } from '../../lib/tiendaPage';
 
 export default function TiendaPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { canEditCatalog } = useVisualEdit();
-  const { openProduct } = useCmsEdit();
+  const { openProduct, openTiendaPage } = useCmsEdit();
   const filtroParam = searchParams.get('filtro');
   const pasilloParam = searchParams.get('pasillo');
   const queryParam = searchParams.get('q') || '';
@@ -20,6 +22,7 @@ export default function TiendaPage() {
   const [pasillos, setPasillos] = useState([]);
   const [productos, setProductos] = useState([]);
   const [marcas, setMarcas] = useState([]);
+  const [tiendaPage, setTiendaPage] = useState(() => withTiendaPage(MiloStore.getAjustes()));
   const activePasillo = marcaParam ? '' : (pasilloParam || 'todos');
   const [filtroTipo, setFiltroTipo] = useState(filtroParam === 'en-camino' ? 'en-camino' : 'todos');
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -30,6 +33,7 @@ export default function TiendaPage() {
     setPasillos(MiloStore.getPasillos());
     setProductos(MiloStore.getProductos());
     setMarcas(MiloStore.getMarcas());
+    setTiendaPage(withTiendaPage(MiloStore.getAjustes()));
   };
 
   useEffect(() => {
@@ -54,8 +58,6 @@ export default function TiendaPage() {
     if (marcaParam && String(p.marca || '').toLowerCase() !== marcaParam) return false;
     return true;
   });
-
-  const countEnCamino = productos.filter((p) => p.enCamino).length;
 
   const handleAddToCart = (producto, tipo, varianteId) => {
     const added = MiloStore.addToCarrito(producto, tipo, varianteId);
@@ -92,14 +94,16 @@ export default function TiendaPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-3xl font-medium tracking-tight text-neutral-900 dark:text-white">Tienda</h1>
-        <p className="mt-2 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
-          Salud estética para rostro, cuerpo y bienestar. Marcas como fuXion, Riman y fórmulas de cabina.
-          {queryParam ? ` Resultados para “${queryParam}”.` : ''}
-          {marcaParam ? ` Filtro de marca: ${marcaParam}.` : ''}
-        </p>
-      </div>
+      <EditHotspot enabled={canEditCatalog} onEdit={openTiendaPage} label="Editar cabecera">
+        <div>
+          <h1 className="text-3xl font-medium tracking-tight text-neutral-900 dark:text-white">{tiendaPage.title}</h1>
+          <p className="mt-2 max-w-2xl text-sm text-neutral-500 dark:text-neutral-400">
+            {tiendaPage.description}
+            {queryParam ? ` Resultados para “${queryParam}”.` : ''}
+            {marcaParam ? ` Filtro de marca: ${marcaParam}.` : ''}
+          </p>
+        </div>
+      </EditHotspot>
 
       {addedNotice && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-neutral-900 px-4 py-2.5 text-xs font-medium text-white shadow-lg">
@@ -144,46 +148,25 @@ export default function TiendaPage() {
         })}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-neutral-200 py-3 dark:border-neutral-800">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center gap-2 overflow-x-auto border-y border-neutral-200 py-3 apple-scroll dark:border-neutral-800">
+        {[
+          { id: 'todos', label: 'Todos' },
+          { id: 'disponibles', label: 'Disponibles' },
+          { id: 'en-camino', label: 'En camino' }
+        ].map((tab) => (
           <button
-            onClick={() => setFiltroTipo('todos')}
-            className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-all ${
-              filtroTipo === 'todos'
+            key={tab.id}
+            type="button"
+            onClick={() => setFiltroTipo(tab.id)}
+            className={`whitespace-nowrap px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] transition-all ${
+              filtroTipo === tab.id
                 ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
+                : 'border border-neutral-200 text-neutral-600 hover:border-neutral-900 dark:border-neutral-800 dark:text-neutral-400'
             }`}
           >
-            Todos ({productos.length})
+            {tab.label}
           </button>
-
-          <button
-            onClick={() => setFiltroTipo('disponibles')}
-            className={`px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-all ${
-              filtroTipo === 'disponibles'
-                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-            }`}
-          >
-            Disponibles
-          </button>
-
-          <button
-            onClick={() => setFiltroTipo('en-camino')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-all ${
-              filtroTipo === 'en-camino'
-                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
-                : 'text-neutral-500 hover:text-neutral-900 dark:hover:text-white'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span>En camino ({countEnCamino})</span>
-          </button>
-        </div>
-
-        <span className="text-xs text-neutral-500">
-          Mostrando {filteredProducts.length} productos
-        </span>
+        ))}
       </div>
 
       {filteredProducts.length === 0 ? (

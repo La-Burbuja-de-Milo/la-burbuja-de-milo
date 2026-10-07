@@ -5,6 +5,7 @@ import PresentacionPicker from './PresentacionPicker';
 import { formatCOP } from '../../lib/money';
 import { pasilloLabels } from '../../lib/pasillos';
 import { findVariante, stockEstado } from '../../lib/variantes';
+import { visualCropProps } from '../../lib/mediaCrop';
 
 export function pickVarianteId(product, varianteId = '') {
   return varianteId
@@ -40,8 +41,7 @@ export default function ProductDetail({
         </button>
 
         <ProductVisual
-          seed={product.id}
-          src={product.imagen}
+          {...visualCropProps(product)}
           variant="hero"
           fit="contain"
           className="mb-5 aspect-[5/4] w-full"

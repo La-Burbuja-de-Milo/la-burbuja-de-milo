@@ -14,6 +14,8 @@ export const DEFAULT_PICKS_TABS = [
   { id: 'valor', label: 'Value items' }
 ];
 
+const FEATURED_CATEGORIAS = ['Diagnóstico', 'Facial', 'Corporal', 'Bienestar'];
+
 function normalizeTabList(saved, defaults) {
   const list = Array.isArray(saved) ? saved : [];
   const byId = new Map(list.map((item) => [item?.id, item]));
@@ -28,12 +30,28 @@ function normalizeAlign(value, fallback = 'center') {
   return HOME_TAB_ALIGNS.some((item) => item.id === value) ? value : fallback;
 }
 
-export function normalizeHomeTabRow(value, defaults, fallbackAlign = 'center') {
+function textOr(value, fallback) {
+  const next = String(value ?? '').trim();
+  return next || fallback;
+}
+
+function normalizeIds(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((item) => String(item || '').trim()).filter(Boolean))].slice(0, 4);
+}
+
+export function normalizeHomeTabRow(value, defaults, fallbackAlign = 'center', extras = {}) {
   const src = value && typeof value === 'object' ? value : {};
-  return {
+  const row = {
     align: normalizeAlign(src.align, fallbackAlign),
-    tabs: normalizeTabList(src.tabs, defaults)
+    tabs: normalizeTabList(src.tabs, defaults),
+    actionLabel: textOr(src.actionLabel, extras.actionLabel || 'Ver más'),
+    actionTo: textOr(src.actionTo, extras.actionTo || '/')
   };
+  if (extras.withServicios) {
+    row.servicioIds = normalizeIds(src.servicioIds);
+  }
+  return row;
 }
 
 export function withHomeTabRows(value = {}) {
@@ -42,9 +60,33 @@ export function withHomeTabRows(value = {}) {
     ? raw.homeTabRows
     : raw;
   return {
-    products: normalizeHomeTabRow(src.products, DEFAULT_PRODUCT_TABS, 'center'),
-    picks: normalizeHomeTabRow(src.picks, DEFAULT_PICKS_TABS, 'center')
+    products: normalizeHomeTabRow(src.products, DEFAULT_PRODUCT_TABS, 'center', {
+      actionLabel: 'Shop all',
+      actionTo: '/tienda'
+    }),
+    picks: normalizeHomeTabRow(src.picks, DEFAULT_PICKS_TABS, 'center', {
+      actionLabel: 'Ver agenda',
+      actionTo: '/citas',
+      withServicios: true
+    })
   };
+}
+
+export function pickFeaturedServicios(servicios = [], ids = []) {
+  const list = Array.isArray(servicios) ? servicios : [];
+  const byId = new Map(list.map((item) => [item.id, item]));
+  const picked = (Array.isArray(ids) ? ids : []).map((id) => byId.get(id)).filter(Boolean);
+  if (picked.length) return picked.slice(0, 4);
+  const featured = [];
+  FEATURED_CATEGORIAS.forEach((categoria) => {
+    const match = list.find((item) => item.categoria === categoria && !featured.includes(item));
+    if (match) featured.push(match);
+  });
+  list.forEach((item) => {
+    if (featured.length >= 4 || featured.includes(item)) return;
+    featured.push(item);
+  });
+  return featured.slice(0, 4);
 }
 
 export function homeTabRowActionClass(align) {

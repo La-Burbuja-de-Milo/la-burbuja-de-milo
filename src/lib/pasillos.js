@@ -1,3 +1,9 @@
+export const CABINA_PASILLO_ID = 'tratamientos';
+
+export function shopPasillos(list = []) {
+  return (Array.isArray(list) ? list : []).filter((item) => item?.id && item.id !== CABINA_PASILLO_ID);
+}
+
 export function productPasillos(product) {
   const list = Array.isArray(product?.pasillos) ? product.pasillos.filter(Boolean) : [];
   if (list.length) return [...new Set(list)];

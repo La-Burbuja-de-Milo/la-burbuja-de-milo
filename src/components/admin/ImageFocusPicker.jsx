@@ -153,42 +153,56 @@ export default function ImageFocusPicker({
       <p className="text-center text-[10px] text-neutral-400">
         {src ? grabHint : emptyHint}
       </p>
-      {src ? (
-        <>
-          <label className="block">
-            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">Acercar</span>
-            <input
-              type="range"
-              min={CIRCLE_ZOOM_MIN}
-              max={CIRCLE_ZOOM_MAX}
-              step="0.05"
-              value={zoom}
-              onChange={(event) => onChange({ zoom: Number(event.target.value) })}
-              className="w-full"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-1.5">
-            <button
-              type="button"
-              onClick={() => onChange({ flipX: !flipX })}
-              className={`border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
-                flipX
-                  ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
-                  : 'border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300'
-              }`}
-            >
-              Espejo
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange({ rotate: normalizeRotate(crop.rotate + 90) })}
-              className="border border-neutral-300 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
-            >
-              Girar{rotate ? ` ${rotate}°` : ''}
-            </button>
-          </div>
-        </>
-      ) : null}
+      <label className="block">
+        <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-500">Acercar</span>
+        <input
+          type="range"
+          min={CIRCLE_ZOOM_MIN}
+          max={CIRCLE_ZOOM_MAX}
+          step="0.05"
+          value={zoom}
+          onChange={(event) => onChange({ zoom: Number(event.target.value) })}
+          className="w-full"
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+        <button
+          type="button"
+          onClick={() => onChange({ flipX: !flipX })}
+          className={`border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+            flipX
+              ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+              : 'border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300'
+          }`}
+        >
+          Espejo
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ flipY: !flipY })}
+          className={`border px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
+            flipY
+              ? 'border-neutral-900 bg-neutral-900 text-white dark:border-white dark:bg-white dark:text-neutral-900'
+              : 'border-neutral-300 text-neutral-600 dark:border-neutral-600 dark:text-neutral-300'
+          }`}
+        >
+          Invertir
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ rotate: normalizeRotate(crop.rotate + 90) })}
+          className="border border-neutral-300 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+        >
+          Girar{rotate ? ` ${rotate}°` : ''}
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ posX: 50, posY: 50, zoom: 1, flipX: false, flipY: false, rotate: 0 })}
+          className="border border-neutral-300 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-600 dark:border-neutral-600 dark:text-neutral-300"
+        >
+          Centrar
+        </button>
+      </div>
     </div>
   );
 }

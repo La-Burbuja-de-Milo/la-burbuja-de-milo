@@ -14,10 +14,13 @@ import CategoryCirclesFields from '../components/admin/CategoryCirclesFields';
 import { withCategoryCircles, normalizeSiteLogo } from '../lib/categoryCircles';
 import { normalizeRewardsStrip } from '../lib/rewardsStrip';
 import RewardsStripFields from '../components/admin/RewardsStripFields';
-import { withHomeTabRows } from '../lib/homeTabRows';
+import { withHomeTabRows, pickFeaturedServicios } from '../lib/homeTabRows';
 import HomeTabRowsFields from '../components/admin/HomeTabRowsFields';
 import { withHomeStory } from '../lib/homeStory';
 import HomeStoryFields from '../components/admin/HomeStoryFields';
+import PhotoCropFields from '../components/admin/PhotoCropFields';
+import { normalizeMediaCrop } from '../lib/mediaCrop';
+import { withTiendaPage } from '../lib/tiendaPage';
 
 const CmsEditContext = createContext(null);
 
@@ -45,6 +48,12 @@ const EMPTY_PRODUCT = {
   ingredientes: '',
   modoUso: '',
   imagen: '',
+  posX: 50,
+  posY: 50,
+  zoom: 1,
+  flipX: false,
+  flipY: false,
+  rotate: 0,
   variantes: [{ ...EMPTY_VARIANTE, id: 'tmp_1' }]
 };
 
@@ -73,7 +82,13 @@ const EMPTY_BLOG = {
   tiempoLectura: '4 min',
   resumen: '',
   contenido: '',
-  imagen: ''
+  imagen: '',
+  posX: 50,
+  posY: 50,
+  zoom: 1,
+  flipX: false,
+  flipY: false,
+  rotate: 0
 };
 
 const EMPTY_SERVICIO = {
@@ -83,7 +98,13 @@ const EMPTY_SERVICIO = {
   precio: '',
   descripcion: '',
   recomendado: '',
-  imagen: ''
+  imagen: '',
+  posX: 50,
+  posY: 50,
+  zoom: 1,
+  flipX: false,
+  flipY: false,
+  rotate: 0
 };
 
 function SelectFromCatalog({ label, value, onChange, items, onCreate, placeholder }) {
@@ -269,9 +290,13 @@ export function CmsEditProvider({ children }) {
   const [rewardsForm, setRewardsForm] = useState(() => normalizeRewardsStrip());
   const [homeTabsOpen, setHomeTabsOpen] = useState(false);
   const [homeTabsForm, setHomeTabsForm] = useState(() => withHomeTabRows());
+  const [featuredServicios, setFeaturedServicios] = useState([]);
+  const [catalogServicios, setCatalogServicios] = useState(() => MiloStore.getServicios());
   const [homeStoryOpen, setHomeStoryOpen] = useState(false);
   const [homeStorySection, setHomeStorySection] = useState('pasillos');
   const [homeStoryForm, setHomeStoryForm] = useState(() => withHomeStory());
+  const [tiendaPageOpen, setTiendaPageOpen] = useState(false);
+  const [tiendaPageForm, setTiendaPageForm] = useState(() => withTiendaPage());
 
   const openProduct = (item = null) => {
     setProduct(item);
@@ -279,6 +304,7 @@ export function CmsEditProvider({ children }) {
       ? {
           ...EMPTY_PRODUCT,
           ...withProductPasillos(item),
+          ...normalizeMediaCrop(item),
           stockMinimo: item.stockMinimo ?? 3,
           variantes: (item.variantes?.length
             ? item.variantes
@@ -304,13 +330,13 @@ export function CmsEditProvider({ children }) {
 
   const openBlog = (item = null) => {
     setBlog(item);
-    setBlogForm(item ? { ...EMPTY_BLOG, ...item } : EMPTY_BLOG);
+    setBlogForm(item ? { ...EMPTY_BLOG, ...item, ...normalizeMediaCrop(item) } : EMPTY_BLOG);
     setBlogOpen(true);
   };
 
   const openServicio = (item = null) => {
     setServicio(item);
-    setServicioForm(item ? { ...EMPTY_SERVICIO, ...item } : EMPTY_SERVICIO);
+    setServicioForm(item ? { ...EMPTY_SERVICIO, ...item, ...normalizeMediaCrop(item) } : EMPTY_SERVICIO);
     setServicioOpen(true);
   };
 
@@ -348,7 +374,11 @@ export function CmsEditProvider({ children }) {
   };
 
   const openHomeTabs = () => {
-    setHomeTabsForm(withHomeTabRows(MiloStore.getAjustes()));
+    const rows = withHomeTabRows(MiloStore.getAjustes());
+    const servicios = MiloStore.getServicios();
+    setHomeTabsForm(rows);
+    setCatalogServicios(servicios);
+    setFeaturedServicios(pickFeaturedServicios(servicios, rows.picks.servicioIds));
     setHomeTabsOpen(true);
   };
 
@@ -361,6 +391,11 @@ export function CmsEditProvider({ children }) {
   const openHomeMarcas = () => openHomeStory('marcas');
   const openHomeEstetica = () => openHomeStory('estetica');
 
+  const openTiendaPage = () => {
+    setTiendaPageForm(withTiendaPage(MiloStore.getAjustes()));
+    setTiendaPageOpen(true);
+  };
+
   useEffect(() => {
     const refreshCatalog = () => {
       setPasillos(MiloStore.getPasillos());
@@ -372,7 +407,7 @@ export function CmsEditProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, bannerOpen }),
+    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, openTiendaPage, bannerOpen }),
     [bannerOpen]
   );
 
@@ -381,7 +416,7 @@ export function CmsEditProvider({ children }) {
       {children}
 
       {productOpen && (
-        <Modal title={product ? (esStockGenerico(product) ? 'Editar producto genérico' : 'Editar producto') : 'Nuevo producto'} onClose={() => setProductOpen(false)}>
+        <Modal title={product ? (esStockGenerico(product) ? 'Editar producto genérico' : 'Editar producto') : 'Nuevo producto'} onClose={() => setProductOpen(false)} wide>
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -419,7 +454,13 @@ export function CmsEditProvider({ children }) {
             }}
             className="space-y-4"
           >
-            <ImageUploader label="Foto de vitrina" value={productForm.imagen} onChange={(imagen) => setProductForm({ ...productForm, imagen })} />
+            <PhotoCropFields
+              value={productForm}
+              onChange={setProductForm}
+              seed={product?.id || 'producto'}
+              label="Foto de vitrina"
+              frameRatio={1}
+            />
             <div>
               <label className={labelClass}>Nombre *</label>
               <input required value={productForm.nombre} onChange={(e) => setProductForm({ ...productForm, nombre: e.target.value })} className={inputClass} />
@@ -582,7 +623,7 @@ export function CmsEditProvider({ children }) {
       )}
 
       {blogOpen && (
-        <Modal title={blog ? 'Editar artículo' : 'Nuevo artículo'} onClose={() => setBlogOpen(false)}>
+        <Modal title={blog ? 'Editar artículo' : 'Nuevo artículo'} onClose={() => setBlogOpen(false)} wide>
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -592,7 +633,13 @@ export function CmsEditProvider({ children }) {
             }}
             className="space-y-4"
           >
-            <ImageUploader label="Portada del artículo" value={blogForm.imagen} onChange={(imagen) => setBlogForm({ ...blogForm, imagen })} />
+            <PhotoCropFields
+              value={blogForm}
+              onChange={setBlogForm}
+              seed={blog?.id || 'blog'}
+              label="Portada del artículo"
+              frameRatio={16 / 10}
+            />
             <div>
               <label className={labelClass}>Título *</label>
               <input required value={blogForm.titulo} onChange={(e) => setBlogForm({ ...blogForm, titulo: e.target.value })} className={inputClass} />
@@ -628,7 +675,7 @@ export function CmsEditProvider({ children }) {
       )}
 
       {servicioOpen && (
-        <Modal title={servicio ? 'Editar servicio' : 'Nuevo servicio'} onClose={() => setServicioOpen(false)}>
+        <Modal title={servicio ? 'Editar servicio' : 'Nuevo servicio'} onClose={() => setServicioOpen(false)} wide>
           <form
             onSubmit={(event) => {
               event.preventDefault();
@@ -643,7 +690,13 @@ export function CmsEditProvider({ children }) {
             }}
             className="space-y-4"
           >
-            <ImageUploader label="Foto del tratamiento" value={servicioForm.imagen} onChange={(imagen) => setServicioForm({ ...servicioForm, imagen })} />
+            <PhotoCropFields
+              value={servicioForm}
+              onChange={setServicioForm}
+              seed={servicio?.id || 'servicio'}
+              label="Foto del tratamiento"
+              frameRatio={3 / 2}
+            />
             <div>
               <label className={labelClass}>Título *</label>
               <input required value={servicioForm.titulo} onChange={(e) => setServicioForm({ ...servicioForm, titulo: e.target.value })} className={inputClass} />
@@ -841,20 +894,40 @@ export function CmsEditProvider({ children }) {
       )}
 
       {homeTabsOpen && (
-        <Modal title="Listados de Inicio" onClose={() => setHomeTabsOpen(false)}>
+        <Modal title="Listados de Inicio" onClose={() => setHomeTabsOpen(false)} className="max-w-5xl">
           <form
             onSubmit={(event) => {
               event.preventDefault();
+              const currentServicios = MiloStore.getServicios();
+              const featuredById = new Map(featuredServicios.map((item) => [item.id, item]));
+              MiloStore.saveServicios(currentServicios.map((item) => (
+                featuredById.has(item.id) ? { ...item, ...featuredById.get(item.id) } : item
+              )));
               const current = MiloStore.getAjustes();
-              MiloStore.saveAjustes({ ...current, homeTabRows: withHomeTabRows(homeTabsForm) });
+              MiloStore.saveAjustes({
+                ...current,
+                homeTabRows: withHomeTabRows({
+                  ...homeTabsForm,
+                  picks: {
+                    ...homeTabsForm.picks,
+                    servicioIds: featuredServicios.map((item) => item.id).filter(Boolean)
+                  }
+                })
+              });
               setHomeTabsOpen(false);
             }}
             className="space-y-4"
           >
             <p className="text-sm text-neutral-500">
-              Cambia los nombres y cómo se alinean en móvil y escritorio: izquierda, centro, derecha o distribuidos.
+              Primero acomoda las fotos de cabina: acercar, espejo, invertir y girar. Luego los nombres y enlaces.
             </p>
-            <HomeTabRowsFields form={homeTabsForm} onChange={setHomeTabsForm} />
+            <HomeTabRowsFields
+              form={homeTabsForm}
+              onChange={setHomeTabsForm}
+              servicios={catalogServicios}
+              featuredServicios={featuredServicios}
+              onFeaturedServiciosChange={setFeaturedServicios}
+            />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setHomeTabsOpen(false)} className={ghostBtn}>Cancelar</button>
               <button type="submit" className={primaryBtn}>Publicar</button>
@@ -886,6 +959,45 @@ export function CmsEditProvider({ children }) {
             <HomeStoryFields form={homeStoryForm} onChange={setHomeStoryForm} section={homeStorySection} />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setHomeStoryOpen(false)} className={ghostBtn}>Cancelar</button>
+              <button type="submit" className={primaryBtn}>Publicar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {tiendaPageOpen && (
+        <Modal title="Cabecera de Tienda" onClose={() => setTiendaPageOpen(false)}>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const current = MiloStore.getAjustes();
+              MiloStore.saveAjustes({ ...current, tiendaPage: withTiendaPage(tiendaPageForm) });
+              setTiendaPageOpen(false);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-neutral-500">
+              Título y descripción que aparecen arriba de los pasillos en Tienda.
+            </p>
+            <div>
+              <label className={labelClass}>Título</label>
+              <input
+                value={tiendaPageForm.title}
+                onChange={(event) => setTiendaPageForm({ ...tiendaPageForm, title: event.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Descripción</label>
+              <textarea
+                rows={4}
+                value={tiendaPageForm.description}
+                onChange={(event) => setTiendaPageForm({ ...tiendaPageForm, description: event.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setTiendaPageOpen(false)} className={ghostBtn}>Cancelar</button>
               <button type="submit" className={primaryBtn}>Publicar</button>
             </div>
           </form>

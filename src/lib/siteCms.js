@@ -1,13 +1,17 @@
 import { normalizeSiteLogo } from './categoryCircles';
 import { withHomeTabRows } from './homeTabRows';
 import { withHomeStory } from './homeStory';
+import { withMediaCrops } from './mediaCrop';
 import { normalizeRewardsStrip } from './rewardsStrip';
+import { withTiendaPage } from './tiendaPage';
 
 export function siteCmsFromAjustes(ajustes = {}) {
   return {
     rewardsStrip: normalizeRewardsStrip(ajustes.rewardsStrip),
     homeTabRows: withHomeTabRows(ajustes),
-    homeStory: withHomeStory(ajustes)
+    homeStory: withHomeStory(ajustes),
+    mediaCrops: withMediaCrops(ajustes),
+    tiendaPage: withTiendaPage(ajustes)
   };
 }
 

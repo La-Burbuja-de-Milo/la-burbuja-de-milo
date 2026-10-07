@@ -4,6 +4,7 @@ import EditHotspot from '../admin/EditHotspot';
 import { PrecioTarjeta } from './PresentacionPicker';
 import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
 import { hasNamedVariantes } from '../../lib/variantes';
+import { visualCropProps } from '../../lib/mediaCrop';
 
 export default function ProductCard({ product, onQuickBuy, onOpen }) {
   const tipo = product.enCamino ? 'reserva_en_camino' : 'compra';
@@ -13,14 +14,14 @@ export default function ProductCard({ product, onQuickBuy, onOpen }) {
   const elegir = hasNamedVariantes(product);
 
   return (
-    <article className="group flex h-full flex-col bg-white dark:bg-neutral-950">
+    <article className="group flex h-full flex-col overflow-hidden border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
       <EditHotspot enabled={canEditCatalog} onEdit={() => openProduct(product)}>
         <button
           type="button"
           onClick={() => onOpen?.(product)}
           className="relative block w-full text-left"
         >
-          <ProductVisual seed={product.id} src={product.imagen} className="aspect-square w-full" />
+          <ProductVisual {...visualCropProps(product)} className="aspect-square w-full" />
           {product.tag && (
             <span className="absolute left-3 top-3 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-900 shadow-sm dark:bg-neutral-950 dark:text-white">
               {product.tag}
@@ -39,7 +40,7 @@ export default function ProductCard({ product, onQuickBuy, onOpen }) {
         </button>
       </EditHotspot>
 
-      <div className="flex flex-1 flex-col px-1 pt-3">
+      <div className="flex flex-1 flex-col px-3 pb-3 pt-3">
         <button
           type="button"
           onClick={() => onOpen?.(product)}

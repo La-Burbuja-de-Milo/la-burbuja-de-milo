@@ -15,6 +15,7 @@ import { useCmsEdit } from '../../context/CmsEditContext';
 import { isGerente } from '../../lib/roles';
 import { findBannerEstilo, findBannerLayout, findBannerTransicion } from '../../lib/bannerFrames';
 import { pasilloLabels } from '../../lib/pasillos';
+import { visualCropProps } from '../../lib/mediaCrop';
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -48,7 +49,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, loading } = useAuth();
-  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica } = useCmsEdit();
+  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, openTiendaPage } = useCmsEdit();
   const gerente = isGerente(profile?.rol);
   const requestedTab = searchParams.get('tab') || 'resumen';
   const activeTab = ADMIN_TABS.includes(requestedTab) ? requestedTab : 'resumen';
@@ -415,7 +416,7 @@ export default function AdminDashboard() {
           <div className={`${panel} space-y-4 p-6`}>
             <div>
               <h3 className="text-lg font-medium">Listados de Inicio</h3>
-              <p className="text-sm text-neutral-500">Bestsellers, New arrivals, Featured top picks: nombres y centrado.</p>
+              <p className="text-sm text-neutral-500">Bestsellers, New arrivals y Featured top picks: nombres, alineación, enlaces y recorte de las fotos de cabina.</p>
             </div>
             <button type="button" onClick={openHomeTabs} className={primaryBtn}>
               Editar listados
@@ -448,6 +449,16 @@ export default function AdminDashboard() {
                 Editar estética
               </button>
             </div>
+          </div>
+
+          <div className={`${panel} space-y-4 p-6`}>
+            <div>
+              <h3 className="text-lg font-medium">Cabecera de Tienda</h3>
+              <p className="text-sm text-neutral-500">Título y descripción de la página Tienda.</p>
+            </div>
+            <button type="button" onClick={openTiendaPage} className={primaryBtn}>
+              Editar cabecera
+            </button>
           </div>
 
           <div className="flex items-center justify-between">
@@ -517,7 +528,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {servicios.map((srv) => (
               <article key={srv.id} className={panel}>
-                <ProductVisual seed={srv.id} src={srv.imagen} className="h-32 w-full" />
+                <ProductVisual {...visualCropProps(srv)} className="h-32 w-full" />
                 <div className="space-y-2 p-5">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{srv.categoria}</p>
                   <h4 className="text-base font-medium">{srv.titulo}</h4>
@@ -679,7 +690,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {blogPosts.map((post) => (
               <article key={post.id} className={panel}>
-                <ProductVisual seed={post.id} src={post.imagen} className="h-32 w-full" />
+                <ProductVisual {...visualCropProps(post)} className="h-32 w-full" />
                 <div className="space-y-2 p-5">
                   <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">{post.categoria}</span>
                   <h4 className="text-sm font-medium">{post.titulo}</h4>

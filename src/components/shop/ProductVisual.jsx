@@ -140,6 +140,14 @@ export default function ProductVisual({
   const palette = PALETTES[hash % PALETTES.length];
   const shape = hash % 3;
   const isHero = variant === 'hero';
+  const placeholderShift = {
+    transform: [
+      circleImageTransform({ flipX, flipY, rotate }),
+      `translate(${((50 - posX) / 50) * 20}%, ${((50 - posY) / 50) * 20}%)`,
+      `scale(${Number(zoom) > 0 ? zoom : 1})`
+    ].join(' '),
+    transformOrigin: 'center center'
+  };
 
   return (
     <div
@@ -155,21 +163,23 @@ export default function ProductVisual({
           backgroundSize: isHero ? '32px 32px' : '22px 22px',
         }}
       />
-      <svg viewBox="0 0 200 180" className="relative h-full w-full" preserveAspectRatio="xMidYMax meet">
-        {isHero ? (
-          <>
-            <DropperBottle x={18} color={palette.bottle} cap={palette.cap} />
-            <PumpBottle x={72} color={palette.accent} cap={palette.cap} />
-            <JarBottle x={124} color={palette.bottle} cap={palette.cap} />
-          </>
-        ) : shape === 0 ? (
-          <PumpBottle x={74} color={palette.bottle} cap={palette.cap} />
-        ) : shape === 1 ? (
-          <JarBottle x={66} color={palette.bottle} cap={palette.cap} />
-        ) : (
-          <DropperBottle x={74} color={palette.bottle} cap={palette.cap} />
-        )}
-      </svg>
+      <div className="absolute inset-0" style={placeholderShift}>
+        <svg viewBox="0 0 200 180" className="relative h-full w-full" preserveAspectRatio="xMidYMax meet">
+          {isHero ? (
+            <>
+              <DropperBottle x={18} color={palette.bottle} cap={palette.cap} />
+              <PumpBottle x={72} color={palette.accent} cap={palette.cap} />
+              <JarBottle x={124} color={palette.bottle} cap={palette.cap} />
+            </>
+          ) : shape === 0 ? (
+            <PumpBottle x={74} color={palette.bottle} cap={palette.cap} />
+          ) : shape === 1 ? (
+            <JarBottle x={66} color={palette.bottle} cap={palette.cap} />
+          ) : (
+            <DropperBottle x={74} color={palette.bottle} cap={palette.cap} />
+          )}
+        </svg>
+      </div>
     </div>
   );
 }

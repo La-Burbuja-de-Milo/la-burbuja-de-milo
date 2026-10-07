@@ -38,6 +38,50 @@ const CATEGORY_LINKS = [
   { to: '/mi-burbuja', label: 'Mi Burbuja' },
 ];
 
+const MOBILE_PRIMARY_LINKS = [
+  { to: '/blog', label: 'Blog' },
+  { to: '/mi-burbuja', label: 'Mi Burbuja' },
+];
+
+const TIENDA_FEATURED = [
+  { to: '/tienda?pasillo=skincare', label: 'Facial', pasilloId: 'skincare' },
+  { to: '/tienda?pasillo=corporal', label: 'Corporal', pasilloId: 'corporal' },
+  { to: '/tienda?pasillo=bienestar', label: 'Bienestar', pasilloId: 'bienestar' },
+];
+
+const TIENDA_NESTED_IDS = new Set(['todos', 'skincare', 'corporal', 'bienestar', 'tratamientos']);
+
+function tiendaSubLinks(pasillos = []) {
+  const extras = pasillos.filter((item) => !TIENDA_NESTED_IDS.has(item.id));
+  return [
+    ...TIENDA_FEATURED,
+    ...extras.map((item) => ({ to: `/tienda?pasillo=${item.id}`, label: item.nombre })),
+    { to: '/tienda?filtro=en-camino', label: 'Novedades' },
+  ].filter((item) => item.label);
+}
+
+function MenuSplitItem({ to, hrefFor, label, open, onToggle, children }) {
+  return (
+    <li>
+      <div className="flex items-center gap-1">
+        <Link to={hrefFor(to)} className="min-w-0 flex-1 py-1 text-left text-sm font-medium text-white">
+          {label}
+        </Link>
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label={open ? `Cerrar ${label}` : `Abrir ${label}`}
+          onClick={onToggle}
+          className="flex h-9 w-9 shrink-0 items-center justify-center text-white/60"
+        >
+          <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+      {open ? children : null}
+    </li>
+  );
+}
+
 const BENEFITS = [
   { icon: Truck, label: 'Envío en compras $200.000+' },
   { icon: RefreshCcw, label: 'Reserva en camino' },
@@ -292,8 +336,15 @@ function AppChrome() {
   const [cartCount, setCartCount] = useState(0);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [tiendaMenuOpen, setTiendaMenuOpen] = useState(false);
+  const [marcasMenuOpen, setMarcasMenuOpen] = useState(false);
+  const [cabinaMenuOpen, setCabinaMenuOpen] = useState(false);
+  const menuButtonRef = useRef(null);
+  const mobileMenuRef = useRef(null);
   const [query, setQuery] = useState('');
   const [ajustes, setAjustes] = useState(() => MiloStore.getAjustes());
+  const [pasillos, setPasillos] = useState(() => MiloStore.getPasillos());
+  const [marcas, setMarcas] = useState(() => MiloStore.getMarcas());
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -314,6 +365,8 @@ function AppChrome() {
     const refreshChrome = () => {
       updateCartCounter();
       setAjustes(MiloStore.getAjustes());
+      setPasillos(MiloStore.getPasillos());
+      setMarcas(MiloStore.getMarcas());
     };
     refreshChrome();
     window.addEventListener('milo_store_updated', refreshChrome);
@@ -322,7 +375,41 @@ function AppChrome() {
 
   useEffect(() => {
     setIsMenuOpen(false);
+    setTiendaMenuOpen(false);
+    setMarcasMenuOpen(false);
+    setCabinaMenuOpen(false);
   }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    if (isMenuOpen) return;
+    setTiendaMenuOpen(false);
+    setMarcasMenuOpen(false);
+    setCabinaMenuOpen(false);
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isMenuOpen) return undefined;
+    const closeMenu = () => setIsMenuOpen(false);
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+    const onPointerDown = (event) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (mobileMenuRef.current?.contains(target)) return;
+      if (menuButtonRef.current?.contains(target)) return;
+      closeMenu();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('pointerdown', onPointerDown);
+    };
+  }, [isMenuOpen]);
 
   const submitSearch = (event) => {
     event.preventDefault();
@@ -364,6 +451,7 @@ function AppChrome() {
         <div className="mx-auto grid max-w-[1440px] grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center px-1 py-1 sm:px-2 lg:flex lg:gap-4 lg:px-8 lg:py-3">
           <div className="flex items-center justify-start lg:hidden">
             <button
+              ref={menuButtonRef}
               type="button"
               className="flex h-11 w-11 items-center justify-center"
               aria-label={isMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
@@ -473,7 +561,11 @@ function AppChrome() {
         </nav>
 
         {isMenuOpen && (
-          <nav className="border-t border-neutral-200 bg-neutral-950 px-4 py-4 dark:border-neutral-800 lg:hidden" aria-label="Menú móvil">
+          <nav
+            ref={mobileMenuRef}
+            className="border-t border-neutral-200 bg-neutral-950 px-4 py-4 dark:border-neutral-800 lg:hidden"
+            aria-label="Menú móvil"
+          >
             <form onSubmit={submitSearch} className="mb-4">
               <label className="sr-only" htmlFor="busqueda-movil">Buscar productos</label>
               <div className="relative">
@@ -488,7 +580,75 @@ function AppChrome() {
               </div>
             </form>
             <ul className="flex flex-col gap-3">
-              {CATEGORY_LINKS.map((link) => (
+              <li>
+                <Link to={hrefFor('/')} className="block py-1 text-sm font-medium text-white">
+                  Inicio
+                </Link>
+              </li>
+              <MenuSplitItem
+                to="/tienda"
+                hrefFor={hrefFor}
+                label="Tienda"
+                open={tiendaMenuOpen}
+                onToggle={() => {
+                  setTiendaMenuOpen((open) => !open);
+                  setMarcasMenuOpen(false);
+                }}
+              >
+                <ul className="mt-2 ml-3 flex flex-col gap-2 border-l border-white/20 pl-3">
+                  {tiendaSubLinks(pasillos).map((link) => (
+                    <li key={`${link.to}-${link.label}`}>
+                      <Link
+                        to={hrefFor(link.to)}
+                        className="block py-0.5 text-sm font-medium text-white/80"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                  <li>
+                    <button
+                      type="button"
+                      aria-expanded={marcasMenuOpen}
+                      onClick={() => setMarcasMenuOpen((open) => !open)}
+                      className="flex w-full items-center justify-between py-0.5 text-left text-sm font-medium text-white/80"
+                    >
+                      Marcas
+                      <ChevronDown className={`h-4 w-4 shrink-0 text-white/50 transition-transform ${marcasMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                    {marcasMenuOpen ? (
+                      <ul className="mt-2 ml-3 flex flex-col gap-2 border-l border-white/15 pl-3">
+                        {marcas.map((marca) => (
+                          <li key={marca.id}>
+                            <Link
+                              to={hrefFor(`/tienda?marca=${encodeURIComponent(String(marca.nombre || '').toLowerCase())}`)}
+                              className="block py-0.5 text-sm font-medium text-white/70"
+                            >
+                              {marca.nombre}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                </ul>
+              </MenuSplitItem>
+              <MenuSplitItem
+                to="/citas"
+                hrefFor={hrefFor}
+                label="Cabina"
+                open={cabinaMenuOpen}
+                onToggle={() => setCabinaMenuOpen((open) => !open)}
+              >
+                <ul className="mt-2 ml-3 flex flex-col gap-2 border-l border-white/20 pl-3">
+                  <li>
+                    <Link to={hrefFor('/citas')} className="block py-0.5 text-sm font-medium text-white/80">
+                      Protocolos de cabina
+                    </Link>
+                  </li>
+                </ul>
+              </MenuSplitItem>
+              {MOBILE_PRIMARY_LINKS.map((link) => (
                 <li key={link.to}>
                   <Link
                     to={hrefFor(link.to)}
@@ -533,6 +693,16 @@ function AppChrome() {
           </nav>
         )}
       </header>
+
+      {isMenuOpen ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          onClick={() => setIsMenuOpen(false)}
+        />
+      ) : null}
 
       <div className="hidden border-b border-neutral-200 bg-[#f5f5f5] dark:border-neutral-800 dark:bg-neutral-900 lg:block">
         <div className="mx-auto flex max-w-[1440px] items-center justify-center gap-8 overflow-x-auto px-8 py-3 text-[13px] text-neutral-700 dark:text-neutral-300">

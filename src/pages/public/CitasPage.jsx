@@ -8,6 +8,7 @@ import { Calendar, Clock, CheckCircle2, User, Phone, Mail, ArrowRight, Download,
 import EditHotspot from '../../components/admin/EditHotspot';
 import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
 import { formatCOP } from '../../lib/money';
+import { visualCropProps } from '../../lib/mediaCrop';
 
 const HORARIOS_DISPONIBLES = [
   '09:00', '10:00', '11:15', '14:00', '15:15', '16:30', '17:45'
@@ -148,7 +149,7 @@ export default function CitasPage() {
                     isSelected ? 'border-neutral-900' : 'border-neutral-200 hover:border-neutral-900'
                   }`}
                 >
-                  <ProductVisual seed={srv.id} src={srv.imagen} className="h-40 w-full" />
+                  <ProductVisual {...visualCropProps(srv)} className="h-40 w-full" />
                   <div className="flex flex-1 flex-col p-5">
                     <div className="mb-2 flex items-center justify-between">
                       <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
