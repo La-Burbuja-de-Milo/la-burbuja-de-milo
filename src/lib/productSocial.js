@@ -1,8 +1,18 @@
+const SITE_ORIGIN = 'https://la-burbuja-de-milo.vercel.app';
+
+function shareOrigin() {
+  const origin = typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : SITE_ORIGIN;
+  if (/localhost|127\.0\.0\.1/i.test(origin)) return SITE_ORIGIN;
+  return origin;
+}
+
 export function productPermalink(product) {
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const url = new URL('/tienda', origin || 'https://la-burbuja-de-milo.vercel.app');
-  if (product?.id) url.searchParams.set('producto', product.id);
-  return url.toString();
+  const origin = shareOrigin();
+  const id = String(product?.id || '').trim();
+  if (!id) return `${origin}/tienda`;
+  return `${origin}/p/${encodeURIComponent(id)}`;
 }
 
 export function productShareText(product) {

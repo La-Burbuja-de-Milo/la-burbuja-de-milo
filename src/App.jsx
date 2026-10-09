@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route, useParams } from 'react-router-dom';
 
 import AppLayout from './components/layout/AppLayout';
 import LandingPage from './pages/public/LandingPage';
@@ -13,6 +13,12 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import RequireAuth from './components/auth/RequireAuth';
 import { AuthProvider } from './context/AuthContext';
 
+function ProductShareRedirect() {
+  const { id } = useParams();
+  const next = id ? `/tienda?producto=${encodeURIComponent(id)}` : '/tienda';
+  return <Navigate to={next} replace />;
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -21,6 +27,7 @@ function App() {
           <Route path="/" element={<AppLayout />}>
             <Route index element={<LandingPage />} />
             <Route path="tienda" element={<TiendaPage />} />
+            <Route path="p/:id" element={<ProductShareRedirect />} />
             <Route path="citas" element={<CitasPage />} />
             <Route path="blog" element={<BlogPage />} />
             <Route path="login" element={<LoginPage />} />
