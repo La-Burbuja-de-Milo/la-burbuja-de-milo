@@ -7,7 +7,9 @@ import { withHomeTabRows } from '../lib/homeTabRows';
 import { withHomeStory } from '../lib/homeStory';
 import { withMediaCrops } from '../lib/mediaCrop';
 import { withTiendaPage } from '../lib/tiendaPage';
-import { logoWithCms, pickCmsValue, siteCmsFromAjustes, siteCmsFromLogo } from '../lib/siteCms';
+import { withTiendaMarcas } from '../lib/tiendaMarcas';
+import { withTiendaFeed } from '../lib/tiendaFeed';
+import { logoWithCms, pickCmsList, pickCmsValue, siteCmsFromAjustes, siteCmsFromLogo } from '../lib/siteCms';
 
 const KEYS = {
   BANNERS: 'milo_banners',
@@ -335,6 +337,11 @@ export function mapAjustesFromDb(row) {
     homeStory: withHomeStory(pickCmsValue(row.home_story, cms.homeStory)),
     mediaCrops: withMediaCrops(pickCmsValue(row.media_crops, cms.mediaCrops)),
     tiendaPage: withTiendaPage(pickCmsValue(row.tienda_page, cms.tiendaPage)),
+    tiendaFeed: withTiendaFeed(pickCmsValue(row.tienda_feed, cms.tiendaFeed)),
+    tiendaMarcas: withTiendaMarcas(pickCmsValue(row.tienda_marcas, cms.tiendaMarcas)),
+    shopPasillos: pickCmsList(row.shop_pasillos, cms.shopPasillos),
+    shopMarcas: pickCmsList(row.shop_marcas, cms.shopMarcas),
+    shopEtiquetas: pickCmsList(row.shop_etiquetas, cms.shopEtiquetas),
     updatedAt: row.updated_at || null
   };
 }
@@ -353,7 +360,8 @@ function mapAjustesToDb(ajustes) {
     home_tab_rows: cms.homeTabRows,
     home_story: cms.homeStory,
     media_crops: cms.mediaCrops,
-    tienda_page: cms.tiendaPage
+    tienda_page: cms.tiendaPage,
+    tienda_marcas: cms.tiendaMarcas
   };
 }
 
@@ -448,6 +456,15 @@ async function persistAjustesImages(ajustes) {
     }
     return next;
   };
+  const tiendaMarcas = withTiendaMarcas(ajustes);
+  const tiendaMarcaCircles = [];
+  for (const circle of tiendaMarcas.circles) {
+    const imagen = circle?.imagen
+      ? await uploadVitrinaAsset(`tienda-marcas/${circle.id || 'item'}`, circle.imagen)
+      : circle?.imagen;
+    tiendaMarcaCircles.push({ ...circle, imagen });
+  }
+  const tiendaFeed = withTiendaFeed(ajustes);
   return {
     ...ajustes,
     categoryCircles,
@@ -456,6 +473,26 @@ async function persistAjustesImages(ajustes) {
       ...story,
       pasillos: { ...story.pasillos, items: await persistCards(story.pasillos.items, 'story/pasillos') },
       marcas: { ...story.marcas, items: await persistCards(story.marcas.items, 'story/marcas') }
+    },
+    tiendaMarcas: { ...tiendaMarcas, circles: tiendaMarcaCircles },
+    tiendaFeed: {
+      ...tiendaFeed,
+      hero: await persistCards(tiendaFeed.hero, 'tienda-feed/hero'),
+      inserts: await Promise.all((tiendaFeed.inserts || []).map(async (item) => {
+        const imagen = item?.imagen
+          ? await uploadVitrinaAsset(`tienda-feed/inserts/${item.id || 'item'}`, item.imagen)
+          : item?.imagen;
+        const circles = [];
+        for (const circle of item.circles || []) {
+          circles.push({
+            ...circle,
+            imagen: circle?.imagen
+              ? await uploadVitrinaAsset(`tienda-feed/circles/${circle.id || 'item'}`, circle.imagen)
+              : circle?.imagen
+          });
+        }
+        return { ...item, imagen, circles };
+      }))
     }
   };
 }
@@ -667,7 +704,7 @@ export function syncStoreKey(key, data) {
   });
 }
 
-export async function publishCatalogToSupabase({ banners, ajustes, persistLocal } = {}) {
+export async function publishCatalogToSupabase({ banners, pasillos, ajustes, persistLocal } = {}) {
   if (!isSupabaseConfigured || !supabase) {
     return { ok: false, error: 'Supabase no está configurado en este entorno.' };
   }
@@ -680,7 +717,7 @@ export async function publishCatalogToSupabase({ banners, ajustes, persistLocal 
   const bannersReady = await persistBannerImages(banners);
   const ajustesReady = await persistAjustesImages(ajustes);
   if (typeof persistLocal === 'function') {
-    persistLocal({ banners: bannersReady, ajustes: ajustesReady });
+    persistLocal({ banners: bannersReady, ajustes: ajustesReady, pasillos });
   }
 
   const errors = [];
@@ -688,6 +725,13 @@ export async function publishCatalogToSupabase({ banners, ajustes, persistLocal 
     await replaceRows('banners', bannersReady, mapBannerToDb);
   } catch (error) {
     errors.push(friendlySyncError('banners', error));
+  }
+  try {
+    if (Array.isArray(pasillos) && pasillos.length) {
+      await replaceRows('pasillos', pasillos, mapPasilloToDb);
+    }
+  } catch (error) {
+    errors.push(friendlySyncError('pasillos', error));
   }
   try {
     await upsertAjustes(ajustesReady);
@@ -698,5 +742,5 @@ export async function publishCatalogToSupabase({ banners, ajustes, persistLocal 
   if (errors.length) {
     return { ok: false, error: errors.join(' ') };
   }
-  return { ok: true, message: 'Publicado en el sitio: vitrina, pasillos, marcas, estética y franja.' };
+  return { ok: true, message: 'Publicado en el sitio: vitrina, pasillos, círculos de marca, estética y franja.' };
 }

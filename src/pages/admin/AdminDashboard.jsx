@@ -49,7 +49,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { profile, loading } = useAuth();
-  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, openTiendaPage } = useCmsEdit();
+  const { openProduct: handleOpenProductModal, openBanner: handleOpenBannerModal, openBlog: handleOpenBlogModal, openServicio: handleOpenServicioModal, openFicha: handleOpenFicha, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, openTiendaPage, openPasillos, openTiendaMarcas, openTiendaFeed } = useCmsEdit();
   const gerente = isGerente(profile?.rol);
   const requestedTab = searchParams.get('tab') || 'resumen';
   const activeTab = ADMIN_TABS.includes(requestedTab) ? requestedTab : 'resumen';
@@ -454,11 +454,22 @@ export default function AdminDashboard() {
           <div className={`${panel} space-y-4 p-6`}>
             <div>
               <h3 className="text-lg font-medium">Cabecera de Tienda</h3>
-              <p className="text-sm text-neutral-500">Título y descripción de la página Tienda.</p>
+              <p className="text-sm text-neutral-500">Piezas visuales, sugerencias del scroll, título, pasillos y círculos de marca.</p>
             </div>
-            <button type="button" onClick={openTiendaPage} className={primaryBtn}>
-              Editar cabecera
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={openTiendaFeed} className={primaryBtn}>
+                Editar piezas
+              </button>
+              <button type="button" onClick={openTiendaPage} className={primaryBtn}>
+                Editar cabecera
+              </button>
+              <button type="button" onClick={openPasillos} className={primaryBtn}>
+                Editar pasillos
+              </button>
+              <button type="button" onClick={openTiendaMarcas} className={primaryBtn}>
+                Editar marcas
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">

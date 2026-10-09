@@ -4,6 +4,13 @@ export function hasNamedVariantes(product) {
   return (product?.variantes || []).filter((item) => String(item.nombre || '').trim()).length > 1;
 }
 
+export function pickVarianteId(product, varianteId = '') {
+  return varianteId
+    || (product?.variantes || []).find((item) => product.enCamino || Number(item.stock) > 0)?.id
+    || product?.variantes?.[0]?.id
+    || '';
+}
+
 export function findVariante(product, varianteId) {
   const list = product?.variantes || [];
   if (!list.length) return null;

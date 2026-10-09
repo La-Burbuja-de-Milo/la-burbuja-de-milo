@@ -26,12 +26,12 @@ import { hasEditParam, navHrefForStaff, withoutEditParam } from '../../lib/visua
 import PublishCatalogButton from '../admin/PublishCatalogButton';
 import ProductVisual from '../shop/ProductVisual';
 
-const CATEGORY_LINKS = [
+const CATEGORY_LINK_BASE = [
   { to: '/', label: 'Inicio', end: true },
   { to: '/tienda', label: 'Tienda' },
-  { to: '/tienda?pasillo=skincare', label: 'Facial' },
-  { to: '/tienda?pasillo=corporal', label: 'Corporal' },
-  { to: '/tienda?pasillo=bienestar', label: 'Bienestar' },
+  { to: '/tienda?pasillo=skincare', label: 'Cosmética facial', pasilloId: 'skincare' },
+  { to: '/tienda?pasillo=corporal', label: 'Cosmética corporal', pasilloId: 'corporal' },
+  { to: '/tienda?pasillo=bienestar', label: 'Bienestar', pasilloId: 'bienestar' },
   { to: '/citas', label: 'Cabina' },
   { to: '/tienda?filtro=en-camino', label: 'Novedades' },
   { to: '/blog', label: 'Blog' },
@@ -43,19 +43,25 @@ const MOBILE_PRIMARY_LINKS = [
   { to: '/mi-burbuja', label: 'Mi Burbuja' },
 ];
 
-const TIENDA_FEATURED = [
-  { to: '/tienda?pasillo=skincare', label: 'Facial', pasilloId: 'skincare' },
-  { to: '/tienda?pasillo=corporal', label: 'Corporal', pasilloId: 'corporal' },
-  { to: '/tienda?pasillo=bienestar', label: 'Bienestar', pasilloId: 'bienestar' },
-];
+const TIENDA_MENU_SKIP = new Set(['todos', 'tratamientos']);
 
-const TIENDA_NESTED_IDS = new Set(['todos', 'skincare', 'corporal', 'bienestar', 'tratamientos']);
+function pasilloLabel(pasillos, id, fallback) {
+  return pasillos.find((item) => item.id === id)?.nombre || fallback;
+}
+
+function categoryLinks(pasillos = []) {
+  return CATEGORY_LINK_BASE.map((link) => (
+    link.pasilloId
+      ? { ...link, label: pasilloLabel(pasillos, link.pasilloId, link.label) }
+      : link
+  ));
+}
 
 function tiendaSubLinks(pasillos = []) {
-  const extras = pasillos.filter((item) => !TIENDA_NESTED_IDS.has(item.id));
   return [
-    ...TIENDA_FEATURED,
-    ...extras.map((item) => ({ to: `/tienda?pasillo=${item.id}`, label: item.nombre })),
+    ...pasillos
+      .filter((item) => !TIENDA_MENU_SKIP.has(item.id))
+      .map((item) => ({ to: `/tienda?pasillo=${item.id}`, label: item.nombre })),
     { to: '/tienda?filtro=en-camino', label: 'Novedades' },
   ].filter((item) => item.label);
 }
@@ -379,8 +385,13 @@ function AppChrome() {
       setMarcas(MiloStore.getMarcas());
     };
     refreshChrome();
+    const openCart = () => setIsCartOpen(true);
     window.addEventListener('milo_store_updated', refreshChrome);
-    return () => window.removeEventListener('milo_store_updated', refreshChrome);
+    window.addEventListener('milo_open_cart', openCart);
+    return () => {
+      window.removeEventListener('milo_store_updated', refreshChrome);
+      window.removeEventListener('milo_open_cart', openCart);
+    };
   }, []);
 
   useEffect(() => {
@@ -551,7 +562,7 @@ function AppChrome() {
 
         <nav className="hidden bg-neutral-950 lg:block" aria-label="Categorías">
           <ul className="mx-auto flex max-w-[1440px] items-center gap-7 overflow-x-auto px-8 py-3">
-            {CATEGORY_LINKS.map((link) => {
+            {categoryLinks(pasillos).map((link) => {
               const active = linkActive(location.pathname, location.search.slice(1), link.to, link.end);
               return (
                 <li key={link.to}>

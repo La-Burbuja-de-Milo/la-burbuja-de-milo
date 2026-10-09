@@ -12,7 +12,10 @@ import { withHomeTabRows } from '../lib/homeTabRows';
 import { storyCardsHaveInlinePhotos, storyCardsHavePhotos, withHomeStory } from '../lib/homeStory';
 import { applyMediaCrops, collectMediaCrops, mediaCropsHaveValues, withMediaCrops } from '../lib/mediaCrop';
 import { withTiendaPage } from '../lib/tiendaPage';
-import { productPasillos, shopPasillos, withProductPasillos } from '../lib/pasillos';
+import { tiendaMarcasHaveInlinePhotos, tiendaMarcasHavePhotos, withTiendaMarcas } from '../lib/tiendaMarcas';
+import { tiendaFeedHaveInlinePhotos, tiendaFeedHavePhotos, withTiendaFeed } from '../lib/tiendaFeed';
+import { asShopList, marcasFromSiteCms } from '../lib/siteCms';
+import { productPasillos, shopPasillos, withPasilloNames, withProductPasillos } from '../lib/pasillos';
 
 export { esStockGenerico, findVariante, hasNamedVariantes, stockEstado };
 
@@ -25,6 +28,7 @@ const STORAGE_KEYS = {
   CLIENTES: 'milo_clientes',
   BLOG: 'milo_blog',
   CARRITO: 'milo_carrito',
+  FAVORITOS: 'milo_favoritos',
   RESERVAS: 'milo_reservas',
   AJUSTES: 'milo_ajustes',
   MARCAS: 'milo_marcas',
@@ -34,8 +38,8 @@ const STORAGE_KEYS = {
 
 // Datos semilla realistas de alta estética
 export const PASILLO_OPTIONS = [
-  { id: 'skincare', nombre: 'Estética facial' },
-  { id: 'corporal', nombre: 'Estética corporal' },
+  { id: 'skincare', nombre: 'Cosmética facial' },
+  { id: 'corporal', nombre: 'Cosmética corporal' },
   { id: 'capilar', nombre: 'Cuidado capilar' },
   { id: 'bienestar', nombre: 'Bienestar y nutrición' },
   { id: 'nutricosmetica', nombre: 'Nutricosmética' }
@@ -131,8 +135,8 @@ const SEED_BANNERS = [
 
 const SEED_PASILLOS = [
   { id: 'todos', nombre: 'Toda la tienda', icon: 'Sparkles' },
-  { id: 'skincare', nombre: 'Estética facial', icon: 'Droplets' },
-  { id: 'corporal', nombre: 'Estética corporal', icon: 'Heart' },
+  { id: 'skincare', nombre: 'Cosmética facial', icon: 'Droplets' },
+  { id: 'corporal', nombre: 'Cosmética corporal', icon: 'Heart' },
   { id: 'capilar', nombre: 'Cuidado capilar', icon: 'Wind' },
   { id: 'bienestar', nombre: 'Bienestar y nutrición', icon: 'Leaf' },
   { id: 'nutricosmetica', nombre: 'Nutricosmética', icon: 'ShieldCheck' }
@@ -702,7 +706,9 @@ const SEED_AJUSTES = {
   homeTabRows: withHomeTabRows(),
   homeStory: withHomeStory(),
   mediaCrops: {},
-  tiendaPage: withTiendaPage()
+  tiendaPage: withTiendaPage(),
+  tiendaFeed: withTiendaFeed(),
+  tiendaMarcas: withTiendaMarcas()
 };
 
 const LEGACY_PROMO = 'Bienvenida a La Burbuja de Milo | 15% en tu primera compra con código MILO15';
@@ -898,6 +904,18 @@ function mergeAjustesPreferLocal(local, remote) {
   const localTiendaPage = local.tiendaPage && typeof local.tiendaPage === 'object';
   const remoteTiendaPage = remote.tiendaPage && typeof remote.tiendaPage === 'object';
   const keepLocalTiendaPage = (localTiendaPage && !remoteTiendaPage) || (localTiendaPage && remoteTiendaPage && localIsNewer);
+  const localTiendaMarcas = withTiendaMarcas(local);
+  const remoteTiendaMarcas = withTiendaMarcas(remote);
+  const keepLocalTiendaMarcas = tiendaMarcasHaveInlinePhotos(localTiendaMarcas)
+    || (tiendaMarcasHavePhotos(localTiendaMarcas) && !tiendaMarcasHavePhotos(remoteTiendaMarcas))
+    || (tiendaMarcasHavePhotos(localTiendaMarcas) && tiendaMarcasHavePhotos(remoteTiendaMarcas) && localIsNewer)
+    || ((local.tiendaMarcas && !remote.tiendaMarcas));
+  const localTiendaFeed = withTiendaFeed(local);
+  const remoteTiendaFeed = withTiendaFeed(remote);
+  const keepLocalTiendaFeed = tiendaFeedHaveInlinePhotos(localTiendaFeed)
+    || (tiendaFeedHavePhotos(localTiendaFeed) && !tiendaFeedHavePhotos(remoteTiendaFeed))
+    || (tiendaFeedHavePhotos(localTiendaFeed) && tiendaFeedHavePhotos(remoteTiendaFeed) && localIsNewer)
+    || ((local.tiendaFeed && !remote.tiendaFeed));
   const localStory = withHomeStory(local);
   const remoteStory = withHomeStory(remote);
   const keepLocalStory = storyCardsHaveInlinePhotos(localStory)
@@ -917,6 +935,11 @@ function mergeAjustesPreferLocal(local, remote) {
     homeTabRows: withHomeTabRows(keepLocalHomeTabs ? local : remote),
     homeStory: withHomeStory(keepLocalStory ? local : remote),
     tiendaPage: withTiendaPage(keepLocalTiendaPage ? local : remote),
+    tiendaFeed: withTiendaFeed(keepLocalTiendaFeed ? local : remote),
+    tiendaMarcas: withTiendaMarcas(keepLocalTiendaMarcas ? local : remote),
+    shopPasillos: asShopList(local.shopPasillos).length ? asShopList(local.shopPasillos) : asShopList(remote.shopPasillos),
+    shopMarcas: asShopList(local.shopMarcas).length ? asShopList(local.shopMarcas) : asShopList(remote.shopMarcas),
+    shopEtiquetas: asShopList(local.shopEtiquetas).length ? asShopList(local.shopEtiquetas) : asShopList(remote.shopEtiquetas),
     mediaCrops: keepLocalCrops ? localCrops : (mediaCropsHaveValues(remoteCrops) ? remoteCrops : localCrops),
     categoryCircles: keepLocalCircles ? localCircles : remoteCircles,
     categoryCirclesAlign: keepLocalCircles
@@ -1082,6 +1105,14 @@ export async function hydrateMiloStore() {
     if (key === STORAGE_KEYS.BANNERS) merged = mergeBannersPreferLocal(readRaw(key), data);
     if (key === STORAGE_KEYS.AJUSTES) merged = mergeAjustesPreferLocal(readRaw(key), data);
     saveData(key, applyCatalogMerge(key, merged ?? seedByKey[key], seedByKey[key] ?? merged), { sync: false });
+    if (key === STORAGE_KEYS.AJUSTES && merged) {
+      const marcas = marcasFromSiteCms(merged);
+      if (marcas.length) saveData(STORAGE_KEYS.MARCAS, marcas, { sync: false });
+      const etiquetas = asShopList(merged.shopEtiquetas);
+      if (etiquetas.length) saveData(STORAGE_KEYS.ETIQUETAS, etiquetas, { sync: false });
+      const pasillos = asShopList(merged.shopPasillos);
+      if (pasillos.length) saveData(STORAGE_KEYS.PASILLOS, pasillos, { sync: false });
+    }
   });
 }
 
@@ -1113,8 +1144,8 @@ export const MiloStore = {
   },
 
   // === PASILLOS ===
-  getPasillos: () => shopPasillos(loadData(STORAGE_KEYS.PASILLOS, SEED_PASILLOS)),
-  savePasillos: (pasillos) => saveData(STORAGE_KEYS.PASILLOS, shopPasillos(pasillos)),
+  getPasillos: () => withPasilloNames(shopPasillos(loadData(STORAGE_KEYS.PASILLOS, SEED_PASILLOS))),
+  savePasillos: (pasillos) => saveData(STORAGE_KEYS.PASILLOS, withPasilloNames(shopPasillos(pasillos))),
   addPasillo: (pasillo) => {
     const current = MiloStore.getPasillos();
     const id = slugify(pasillo.nombre);
@@ -1164,6 +1195,30 @@ export const MiloStore = {
   },
   deleteMarca: (id) => {
     MiloStore.saveMarcas(MiloStore.getMarcas().filter((item) => item.id !== id));
+  },
+  syncMarcasFromCircles: (circles) => {
+    const current = MiloStore.getMarcas();
+    const byId = new Map(current.map((item) => [item.id, item]));
+    const seen = new Set();
+    const next = [];
+    let productos = MiloStore.getProductos();
+    let renamed = false;
+    (Array.isArray(circles) ? circles : []).forEach((circle) => {
+      const nombre = String(circle?.label || '').trim();
+      if (!circle?.id || !nombre || seen.has(circle.id)) return;
+      seen.add(circle.id);
+      const prev = byId.get(circle.id);
+      next.push({ id: circle.id, nombre });
+      if (prev && prev.nombre !== nombre) {
+        renamed = true;
+        productos = productos.map((product) => (
+          product.marca === prev.nombre ? { ...product, marca: nombre } : product
+        ));
+      }
+    });
+    const extras = current.filter((item) => !seen.has(item.id));
+    MiloStore.saveMarcas([...next, ...extras]);
+    if (renamed) MiloStore.saveProductos(productos);
   },
 
   getEtiquetas: () => loadData(STORAGE_KEYS.ETIQUETAS, SEED_ETIQUETAS),
@@ -1463,6 +1518,24 @@ export const MiloStore = {
   // === CARRITO & RESERVAS ===
   getCarrito: () => loadData(STORAGE_KEYS.CARRITO, []),
   saveCarrito: (items) => saveData(STORAGE_KEYS.CARRITO, items),
+  openCarrito: () => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new Event('milo_open_cart'));
+  },
+  getFavoritos: () => {
+    const saved = loadData(STORAGE_KEYS.FAVORITOS, []);
+    return Array.isArray(saved) ? saved.map(String).filter(Boolean) : [];
+  },
+  saveFavoritos: (ids) => saveData(STORAGE_KEYS.FAVORITOS, Array.isArray(ids) ? ids.map(String) : [], { sync: false }),
+  isFavorito: (productId) => MiloStore.getFavoritos().includes(String(productId || '')),
+  toggleFavorito: (productId) => {
+    const id = String(productId || '');
+    if (!id) return false;
+    const current = MiloStore.getFavoritos();
+    const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+    MiloStore.saveFavoritos(next);
+    return next.includes(id);
+  },
   addToCarrito: (producto, tipo = 'compra', varianteId) => { // tipo: 'compra' | 'reserva_en_camino'
     const live = MiloStore.getProductos().find((item) => item.id === producto.id) || producto;
     const variante = findVariante(live, varianteId);
@@ -1619,7 +1692,7 @@ export const MiloStore = {
   getAjustes: () => {
     const saved = loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES) || SEED_AJUSTES;
     const { circles, align } = withCategoryCircles(saved);
-    return { ...SEED_AJUSTES, ...saved, categoryCircles: circles, categoryCirclesAlign: align, logo: normalizeSiteLogo(saved.logo), rewardsStrip: normalizeRewardsStrip(saved.rewardsStrip), homeTabRows: withHomeTabRows(saved), homeStory: withHomeStory(saved), mediaCrops: withMediaCrops(saved), tiendaPage: withTiendaPage(saved) };
+    return { ...SEED_AJUSTES, ...saved, categoryCircles: circles, categoryCirclesAlign: align, logo: normalizeSiteLogo(saved.logo), rewardsStrip: normalizeRewardsStrip(saved.rewardsStrip), homeTabRows: withHomeTabRows(saved), homeStory: withHomeStory(saved), mediaCrops: withMediaCrops(saved), tiendaPage: withTiendaPage(saved), tiendaFeed: withTiendaFeed(saved), tiendaMarcas: withTiendaMarcas(saved, loadData(STORAGE_KEYS.MARCAS, SEED_MARCAS)) };
   },
   saveAjustes: (ajustes) => {
     const current = loadData(STORAGE_KEYS.AJUSTES, SEED_AJUSTES) || SEED_AJUSTES;
@@ -1634,7 +1707,12 @@ export const MiloStore = {
       homeTabRows: withHomeTabRows(ajustes.homeTabRows !== undefined ? ajustes : current),
       homeStory: withHomeStory(ajustes.homeStory !== undefined ? ajustes : current),
       mediaCrops: withMediaCrops(ajustes.mediaCrops !== undefined ? ajustes : current),
-      tiendaPage: withTiendaPage(ajustes.tiendaPage !== undefined ? ajustes : current)
+      tiendaPage: withTiendaPage(ajustes.tiendaPage !== undefined ? ajustes : current),
+      tiendaFeed: withTiendaFeed(ajustes.tiendaFeed !== undefined ? ajustes : current),
+      tiendaMarcas: withTiendaMarcas(
+        ajustes.tiendaMarcas !== undefined ? ajustes : current,
+        loadData(STORAGE_KEYS.MARCAS, SEED_MARCAS)
+      )
     };
     const { circles, align } = withCategoryCircles(merged);
     saveData(STORAGE_KEYS.AJUSTES, {
@@ -1663,6 +1741,7 @@ export const MiloStore = {
     localStorage.removeItem(STORAGE_KEYS.CLIENTES);
     localStorage.removeItem(STORAGE_KEYS.BLOG);
     localStorage.removeItem(STORAGE_KEYS.CARRITO);
+    localStorage.removeItem(STORAGE_KEYS.FAVORITOS);
     localStorage.removeItem(STORAGE_KEYS.RESERVAS);
     localStorage.removeItem(STORAGE_KEYS.AJUSTES);
     localStorage.removeItem(STORAGE_KEYS.MARCAS);
@@ -1673,19 +1752,31 @@ export const MiloStore = {
 
   publishCatalog: () => {
     const ajustes = MiloStore.getAjustes();
+    const pasillos = MiloStore.getPasillos();
+    const marcas = MiloStore.getMarcas();
+    const etiquetas = MiloStore.getEtiquetas();
     return publishCatalogToSupabase({
       banners: loadData(STORAGE_KEYS.BANNERS, SEED_BANNERS).map(cloneBanner),
+      pasillos,
       ajustes: {
         ...ajustes,
+        tiendaFeed: withTiendaFeed(ajustes),
+        tiendaMarcas: withTiendaMarcas(ajustes, marcas),
+        shopPasillos: pasillos,
+        shopMarcas: marcas,
+        shopEtiquetas: etiquetas,
         mediaCrops: collectMediaCrops({
           productos: MiloStore.getProductos(),
           servicios: MiloStore.getServicios(),
           blog: MiloStore.getBlogPosts()
         })
       },
-      persistLocal: ({ banners, ajustes: nextAjustes }) => {
+      persistLocal: ({ banners, ajustes: nextAjustes, pasillos: nextPasillos }) => {
         saveData(STORAGE_KEYS.BANNERS, (banners || []).map(cloneBanner), { sync: false });
         saveData(STORAGE_KEYS.AJUSTES, nextAjustes, { sync: false });
+        if (Array.isArray(nextPasillos) && nextPasillos.length) {
+          saveData(STORAGE_KEYS.PASILLOS, nextPasillos, { sync: false });
+        }
       }
     });
   }

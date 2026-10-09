@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader';
 import ProductCard from '../../components/shop/ProductCard';
 import { useAuth } from '../../context/AuthContext';
 import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
-import { Calendar, Clock, UserCheck, CalendarPlus } from 'lucide-react';
+import { Calendar, CalendarPlus, Clock, Pencil, UserCheck } from 'lucide-react';
 
 const tabClass = (active) =>
   `flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-[0.12em] sm:text-[13px] ${
@@ -59,8 +59,7 @@ export default function ClienteDashboard() {
     ['Concierge Milo', ficha?.skinConcierge || 'Equipo Milo'],
   ];
 
-  const handleQuickBuy = (producto, tipo) => {
-    const added = MiloStore.addToCarrito(producto, tipo);
+  const handleAdded = (producto, added) => {
     setNotice(added ? `${producto.nombre} se añadió a tu bolsa` : `No hay stock de ${producto.nombre}`);
     window.setTimeout(() => setNotice(''), 2500);
   };
@@ -101,7 +100,9 @@ export default function ClienteDashboard() {
               >
                 <p className="text-sm font-medium">{cl.nombre}</p>
                 <p className="mt-1 text-xs text-neutral-500">{cl.diagnostico || cl.tipoPiel || 'Sin diagnóstico'}</p>
-                <span className="mt-2 inline-block text-[10px] font-semibold uppercase tracking-[0.14em]">Editar ficha</span>
+                <span className="mt-2 inline-flex h-8 w-8 items-center justify-center bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" aria-hidden="true">
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} />
+                </span>
               </button>
             ))}
           </div>
@@ -207,7 +208,7 @@ export default function ClienteDashboard() {
               <ProductCard
                 key={prod.id}
                 product={prod}
-                onQuickBuy={handleQuickBuy}
+                onAdded={handleAdded}
                 onOpen={() => navigate('/tienda?filtro=en-camino')}
               />
             ))}
@@ -237,9 +238,11 @@ export default function ClienteDashboard() {
             <button
               type="button"
               onClick={() => openFicha(ficha)}
-              className="text-[11px] font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline"
+              aria-label="Editar esta ficha"
+              title="Editar esta ficha"
+              className="inline-flex h-8 w-8 items-center justify-center bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
             >
-              Editar esta ficha
+              <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
             </button>
           )}
         </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Pencil } from 'lucide-react';
 
 export default function EditHotspot({ enabled, onEdit, label = 'Editar', children, className = '', tone = 'dark', placement = 'right' }) {
   if (!enabled || !onEdit) return children;
@@ -13,7 +14,9 @@ export default function EditHotspot({ enabled, onEdit, label = 'Editar', childre
           event.stopPropagation();
           onEdit();
         }}
-        className={`absolute top-2 z-30 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+        aria-label={label}
+        title={label}
+        className={`absolute top-2 z-30 inline-flex h-8 w-8 items-center justify-center ${
           placement === 'left' ? 'left-2' : 'right-2'
         } ${
           tone === 'light'
@@ -21,7 +24,7 @@ export default function EditHotspot({ enabled, onEdit, label = 'Editar', childre
             : 'bg-neutral-900 text-white'
         }`}
       >
-        {label}
+        <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
       </button>
     </div>
   );

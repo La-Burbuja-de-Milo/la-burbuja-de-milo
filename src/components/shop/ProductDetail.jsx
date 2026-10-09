@@ -1,18 +1,16 @@
-import React from 'react';
-import { ShieldCheck, X } from 'lucide-react';
+import React, { useEffect, useId, useRef } from 'react';
+import { ChevronLeft, Pencil, ShieldCheck, X } from 'lucide-react';
 import ProductVisual from './ProductVisual';
 import PresentacionPicker from './PresentacionPicker';
 import { formatCOP } from '../../lib/money';
 import { pasilloLabels } from '../../lib/pasillos';
-import { findVariante, stockEstado } from '../../lib/variantes';
+import { findVariante, pickVarianteId, stockEstado } from '../../lib/variantes';
 import { visualCropProps } from '../../lib/mediaCrop';
 
-export function pickVarianteId(product, varianteId = '') {
-  return varianteId
-    || (product.variantes || []).find((item) => product.enCamino || Number(item.stock) > 0)?.id
-    || product.variantes?.[0]?.id
-    || '';
-}
+export { pickVarianteId };
+
+const HISTORY_KEY = 'miloProductDetail';
+let consumeHistoryTimer = 0;
 
 export default function ProductDetail({
   product,
@@ -28,12 +26,81 @@ export default function ProductDetail({
   const activeId = variante?.id || varianteId;
   const agotada = !product.enCamino && stockEstado(product, variante) === 'agotado';
   const tipo = product.enCamino ? 'reserva_en_camino' : 'compra';
+  const titleId = useId();
+  const onCloseRef = useRef(onClose);
+  const closingRef = useRef(false);
+  const allowBackdropCloseRef = useRef(false);
+  onCloseRef.current = onClose;
+
+  const requestClose = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    onCloseRef.current?.();
+  };
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.clearTimeout(consumeHistoryTimer);
+    if (!window.history.state?.[HISTORY_KEY]) {
+      const previousState = window.history.state && typeof window.history.state === 'object' ? window.history.state : {};
+      window.history.pushState({ ...previousState, [HISTORY_KEY]: true }, '');
+    }
+
+    const onPopState = () => {
+      closingRef.current = true;
+      onCloseRef.current?.();
+    };
+    const onKey = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      requestClose();
+    };
+
+    window.addEventListener('popstate', onPopState);
+    document.addEventListener('keydown', onKey);
+    const backdropTimer = window.setTimeout(() => {
+      allowBackdropCloseRef.current = true;
+    }, 0);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.clearTimeout(backdropTimer);
+      window.removeEventListener('popstate', onPopState);
+      document.removeEventListener('keydown', onKey);
+      consumeHistoryTimer = window.setTimeout(() => {
+        if (window.history.state?.[HISTORY_KEY]) window.history.back();
+      }, 0);
+    };
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto bg-white p-6 text-neutral-900 shadow-2xl apple-scroll dark:bg-neutral-950 dark:text-white sm:p-8">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      role="presentation"
+      onClick={(event) => {
+        if (!allowBackdropCloseRef.current) return;
+        if (event.target === event.currentTarget) requestClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative max-h-[90vh] w-full max-w-xl overflow-y-auto bg-white p-6 text-neutral-900 shadow-2xl apple-scroll dark:bg-neutral-950 dark:text-white sm:p-8"
+        onClick={(event) => event.stopPropagation()}
+      >
         <button
-          onClick={onClose}
+          type="button"
+          onClick={requestClose}
+          className="absolute left-3 top-4 z-10 p-2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white sm:hidden"
+          aria-label="Volver"
+        >
+          <ChevronLeft className="h-5 w-5" strokeWidth={1.75} />
+        </button>
+        <button
+          type="button"
+          onClick={requestClose}
           className="absolute right-4 top-4 z-10 p-2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
           aria-label="Cerrar detalle"
         >
@@ -50,9 +117,11 @@ export default function ProductDetail({
           <button
             type="button"
             onClick={() => openProduct(product)}
-            className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline"
+            aria-label="Editar producto"
+            title="Editar producto"
+            className="mb-4 inline-flex h-8 w-8 items-center justify-center bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
           >
-            Editar producto
+            <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
           </button>
         )}
 
@@ -66,7 +135,7 @@ export default function ProductDetail({
             </span>
           </div>
 
-          <h2 className="text-2xl font-medium text-neutral-900 dark:text-white">
+          <h2 id={titleId} className="text-2xl font-medium text-neutral-900 dark:text-white">
             {product.nombre}
           </h2>
 

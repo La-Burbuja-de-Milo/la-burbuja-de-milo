@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import ImageUploader from './ImageUploader';
 import ImageFocusPicker from './ImageFocusPicker';
 import ProductVisual from '../shop/ProductVisual';
@@ -9,6 +10,7 @@ import {
 } from '../../lib/categoryCircles';
 
 const labelClass = 'block text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-700 dark:text-neutral-300';
+const inputClass = 'w-full border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-900 dark:border-neutral-500 dark:bg-neutral-950 dark:text-white dark:focus:border-white';
 
 function CircleOrderPreview({ circles, align, onReorder }) {
   const rowRef = useRef(null);
@@ -97,8 +99,16 @@ function CircleOrderPreview({ circles, align, onReorder }) {
   );
 }
 
-export default function CategoryCirclesFields({ form, onChange }) {
+export default function CategoryCirclesFields({
+  form,
+  onChange,
+  orderHint = 'Arrastra los círculos con la mano para cambiar el orden. Elige cómo se sientan en Inicio.',
+  editableLabels = false,
+  allowAdd = false,
+  onCreate
+}) {
   const { circles, align } = form;
+  const [draft, setDraft] = useState('');
   const patchCircle = (id, patch) => {
     onChange({
       ...form,
@@ -111,7 +121,7 @@ export default function CategoryCirclesFields({ form, onChange }) {
       <div>
         <p className={labelClass}>Centrado y orden del grupo</p>
         <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-          Arrastra los círculos con la mano para cambiar el orden. Elige cómo se sientan en Inicio.
+          {orderHint}
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {CATEGORY_CIRCLE_ALIGNS.map((item) => {
@@ -142,7 +152,31 @@ export default function CategoryCirclesFields({ form, onChange }) {
       <div className="grid gap-5 sm:grid-cols-2">
         {circles.map((circle) => (
           <div key={circle.id} className="space-y-3 border border-neutral-200 p-3 dark:border-neutral-700">
-            <p className={labelClass}>{circle.label}</p>
+            {editableLabels ? (
+              <div className="flex items-center gap-2">
+                <input
+                  value={circle.label || ''}
+                  onChange={(event) => patchCircle(circle.id, { label: event.target.value })}
+                  className={inputClass}
+                  aria-label={`Nombre de ${circle.label || 'círculo'}`}
+                />
+                {allowAdd && (
+                  <button
+                    type="button"
+                    onClick={() => onChange({
+                      ...form,
+                      circles: circles.filter((item) => item.id !== circle.id)
+                    })}
+                    className="shrink-0 p-1.5 text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
+                    aria-label={`Quitar ${circle.label || 'círculo'}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className={labelClass}>{circle.label}</p>
+            )}
             <ImageFocusPicker
               src={circle.imagen}
               seed={circle.seed}
@@ -164,6 +198,38 @@ export default function CategoryCirclesFields({ form, onChange }) {
           </div>
         ))}
       </div>
+
+      {allowAdd && (
+        <div className="flex gap-2">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              const nombre = draft.trim();
+              if (!nombre || !onCreate) return;
+              onCreate(nombre);
+              setDraft('');
+            }}
+            placeholder="Nueva marca"
+            className={inputClass}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const nombre = draft.trim();
+              if (!nombre || !onCreate) return;
+              onCreate(nombre);
+              setDraft('');
+            }}
+            className="inline-flex items-center gap-1 border border-neutral-900 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] dark:border-white"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Alta
+          </button>
+        </div>
+      )}
     </div>
   );
 }

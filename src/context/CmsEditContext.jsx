@@ -9,6 +9,8 @@ import { isGerente, isStaff } from '../lib/roles';
 import { hasEditParam } from '../lib/visualEdit';
 import { bannerDraft, bannerPersistPayload, withBannerFrames } from '../lib/bannerFrames';
 import { productPasillos, withProductPasillos } from '../lib/pasillos';
+import PasillosFields from '../components/admin/PasillosFields';
+import TiendaMarcasFields from '../components/admin/TiendaMarcasFields';
 import BannerPhotosFields from '../components/admin/BannerPhotosFields';
 import CategoryCirclesFields from '../components/admin/CategoryCirclesFields';
 import { withCategoryCircles, normalizeSiteLogo } from '../lib/categoryCircles';
@@ -21,6 +23,9 @@ import HomeStoryFields from '../components/admin/HomeStoryFields';
 import PhotoCropFields from '../components/admin/PhotoCropFields';
 import { normalizeMediaCrop } from '../lib/mediaCrop';
 import { withTiendaPage } from '../lib/tiendaPage';
+import { withTiendaMarcas } from '../lib/tiendaMarcas';
+import { withTiendaFeed } from '../lib/tiendaFeed';
+import TiendaFeedFields from '../components/admin/TiendaFeedFields';
 
 const CmsEditContext = createContext(null);
 
@@ -297,6 +302,12 @@ export function CmsEditProvider({ children }) {
   const [homeStoryForm, setHomeStoryForm] = useState(() => withHomeStory());
   const [tiendaPageOpen, setTiendaPageOpen] = useState(false);
   const [tiendaPageForm, setTiendaPageForm] = useState(() => withTiendaPage());
+  const [pasillosEditorOpen, setPasillosEditorOpen] = useState(false);
+  const [pasillosForm, setPasillosForm] = useState(() => MiloStore.getPasillos());
+  const [tiendaMarcasOpen, setTiendaMarcasOpen] = useState(false);
+  const [tiendaMarcasForm, setTiendaMarcasForm] = useState(() => withTiendaMarcas(MiloStore.getAjustes(), MiloStore.getMarcas()));
+  const [tiendaFeedOpen, setTiendaFeedOpen] = useState(false);
+  const [tiendaFeedForm, setTiendaFeedForm] = useState(() => withTiendaFeed(MiloStore.getAjustes()));
 
   const openProduct = (item = null) => {
     setProduct(item);
@@ -396,6 +407,21 @@ export function CmsEditProvider({ children }) {
     setTiendaPageOpen(true);
   };
 
+  const openPasillos = () => {
+    setPasillosForm(MiloStore.getPasillos());
+    setPasillosEditorOpen(true);
+  };
+
+  const openTiendaMarcas = () => {
+    setTiendaMarcasForm(withTiendaMarcas(MiloStore.getAjustes(), MiloStore.getMarcas()));
+    setTiendaMarcasOpen(true);
+  };
+
+  const openTiendaFeed = () => {
+    setTiendaFeedForm(withTiendaFeed(MiloStore.getAjustes()));
+    setTiendaFeedOpen(true);
+  };
+
   useEffect(() => {
     const refreshCatalog = () => {
       setPasillos(MiloStore.getPasillos());
@@ -407,7 +433,7 @@ export function CmsEditProvider({ children }) {
   }, []);
 
   const value = useMemo(
-    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, openTiendaPage, bannerOpen }),
+    () => ({ openProduct, openBanner, openBlog, openServicio, openFicha, openPromo, openCategoryCircles, openLogo, openRewards, openHomeTabs, openHomePasillos, openHomeMarcas, openHomeEstetica, openTiendaPage, openPasillos, openTiendaMarcas, openTiendaFeed, bannerOpen }),
     [bannerOpen]
   );
 
@@ -959,6 +985,80 @@ export function CmsEditProvider({ children }) {
             <HomeStoryFields form={homeStoryForm} onChange={setHomeStoryForm} section={homeStorySection} />
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setHomeStoryOpen(false)} className={ghostBtn}>Cancelar</button>
+              <button type="submit" className={primaryBtn}>Publicar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {tiendaMarcasOpen && (
+        <Modal title="Marcas de Tienda" onClose={() => setTiendaMarcasOpen(false)} className="max-w-5xl">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const next = withTiendaMarcas(tiendaMarcasForm);
+              const circles = next.circles.filter((item) => item.id && String(item.label || '').trim());
+              if (!circles.length) return;
+              MiloStore.syncMarcasFromCircles(circles);
+              const current = MiloStore.getAjustes();
+              MiloStore.saveAjustes({
+                ...current,
+                tiendaMarcas: { ...next, circles }
+              });
+              setTiendaMarcasOpen(false);
+            }}
+            className="space-y-4"
+          >
+            <p className="text-sm text-neutral-500">
+              Nombre, foto, recorte y orden de los círculos. Alta suma una marca al carrusel y al menú. Un tap en Tienda filtra esa marca.
+            </p>
+            <TiendaMarcasFields form={tiendaMarcasForm} onChange={setTiendaMarcasForm} />
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setTiendaMarcasOpen(false)} className={ghostBtn}>Cancelar</button>
+              <button type="submit" className={primaryBtn}>Publicar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {pasillosEditorOpen && (
+        <Modal title="Pasillos de Tienda" onClose={() => setPasillosEditorOpen(false)}>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const next = pasillosForm.map((item) => ({
+                ...item,
+                nombre: String(item.nombre || '').trim()
+              }));
+              if (next.some((item) => !item.id || !item.nombre)) return;
+              MiloStore.savePasillos(next);
+              setPasillosEditorOpen(false);
+            }}
+            className="space-y-4"
+          >
+            <PasillosFields pasillos={pasillosForm} onChange={setPasillosForm} />
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setPasillosEditorOpen(false)} className={ghostBtn}>Cancelar</button>
+              <button type="submit" className={primaryBtn}>Publicar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {tiendaFeedOpen && (
+        <Modal title="Feed de Tienda" onClose={() => setTiendaFeedOpen(false)} className="max-w-5xl">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              const current = MiloStore.getAjustes();
+              MiloStore.saveAjustes({ ...current, tiendaFeed: withTiendaFeed({ tiendaFeed: tiendaFeedForm }) });
+              setTiendaFeedOpen(false);
+            }}
+            className="space-y-4"
+          >
+            <TiendaFeedFields form={tiendaFeedForm} onChange={setTiendaFeedForm} pasillos={pasillos} />
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={() => setTiendaFeedOpen(false)} className={ghostBtn}>Cancelar</button>
               <button type="submit" className={primaryBtn}>Publicar</button>
             </div>
           </form>

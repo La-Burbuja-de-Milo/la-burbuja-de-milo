@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { formatCOP } from '../../lib/money';
 import { etiquetaVitrina, hasNamedVariantes, stockEstado } from '../../lib/variantes';
 
@@ -32,6 +33,102 @@ function PrecioFila({ label, precio, agotada, active, as: Tag = 'div', ...props 
         {agotada ? 'Agotada' : formatCOP(precio)}
       </span>
     </Tag>
+  );
+}
+
+export function PresentacionSelect({ product, value, onChange }) {
+  const variantes = (product.variantes || []).filter((item) => String(item.nombre || '').trim());
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onPointer = (event) => {
+      if (!rootRef.current?.contains(event.target)) setOpen(false);
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const selected = variantes.find((item) => item.id === value) || variantes[0];
+  const selectedLabel = etiquetaVitrina(selected?.nombre) || selected?.nombre || '';
+  const frameClass =
+    'flex h-8 w-full items-center border border-neutral-200 bg-white px-2.5 text-[11px] font-normal text-neutral-800 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100';
+
+  if (variantes.length <= 1) {
+    return (
+      <div className="mt-1.5 h-8">
+        {selectedLabel ? (
+          <div className={frameClass}>
+            <span className="min-w-0 truncate">{selectedLabel}</span>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={rootRef} className={`relative mt-1.5 h-8 ${open ? 'z-30' : ''}`}>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Presentación"
+        onClick={() => setOpen((current) => !current)}
+        className={`${frameClass} justify-between gap-2 text-left`}
+      >
+        <span className="min-w-0 truncate">{selectedLabel}</span>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 text-neutral-900 transition-transform dark:text-white ${open ? 'rotate-180' : ''}`}
+          strokeWidth={1.75}
+        />
+      </button>
+      {open ? (
+        <ul
+          role="listbox"
+          aria-label="Presentaciones"
+          className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden border border-neutral-200 bg-white shadow-[0_12px_28px_rgba(23,23,23,0.12)] dark:border-neutral-700 dark:bg-neutral-950 dark:shadow-[0_12px_28px_rgba(0,0,0,0.45)]"
+        >
+          {variantes.map((variante) => {
+            const agotada = !product.enCamino && stockEstado(product, variante) === 'agotado';
+            const active = variante.id === (selected?.id || value);
+            const label = etiquetaVitrina(variante.nombre) || variante.nombre;
+            return (
+              <li key={variante.id} role="none">
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  disabled={agotada}
+                  onClick={() => {
+                    if (agotada) return;
+                    onChange?.(variante.id);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-baseline gap-2 px-2.5 py-2 text-left text-[11px] font-normal leading-tight disabled:cursor-not-allowed disabled:opacity-45 ${
+                    active
+                      ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-900'
+                      : 'text-neutral-700 hover:bg-[#f6f6f6] dark:text-neutral-200 dark:hover:bg-neutral-900'
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  <span className="shrink-0 tabular-nums tracking-tight">
+                    {agotada ? 'Agotada' : formatCOP(variante.precio)}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

@@ -192,8 +192,7 @@ export default function LandingPage() {
 
   const shownProducts = tabbedProducts.length ? tabbedProducts : productos.slice(0, 8);
 
-  const handleQuickBuy = (product, tipo, varianteId) => {
-    const added = MiloStore.addToCarrito(product, tipo, varianteId);
+  const handleAdded = (product, added) => {
     setNotice(added ? `${product.nombre} se añadió a tu bolsa` : `No hay stock de ${product.nombre}`);
     window.setTimeout(() => setNotice(''), 2500);
   };
@@ -373,7 +372,7 @@ export default function LandingPage() {
             <ProductCard
               key={product.id}
               product={product}
-              onQuickBuy={handleQuickBuy}
+              onAdded={handleAdded}
               onOpen={openProductDetail}
             />
           ))}
@@ -420,7 +419,7 @@ export default function LandingPage() {
               <ProductCard
                 key={product.id}
                 product={product}
-                onQuickBuy={handleQuickBuy}
+                onAdded={handleAdded}
                 onOpen={openProductDetail}
               />
             ))}
@@ -572,7 +571,7 @@ export default function LandingPage() {
           onVariante={setSelectedVarianteId}
           onClose={closeProductDetail}
           onAdd={(product, tipo, varianteId) => {
-            handleQuickBuy(product, tipo, varianteId);
+            handleAdded(product, MiloStore.addToCarrito(product, tipo, varianteId));
             closeProductDetail();
           }}
         />

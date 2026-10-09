@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MiloStore } from '../../services/miloStore';
 import PageHeader from '../../components/ui/PageHeader';
 import ProductVisual from '../../components/shop/ProductVisual';
-import { X, ArrowRight } from 'lucide-react';
+import { ArrowRight, Pencil, X } from 'lucide-react';
 import EditHotspot from '../../components/admin/EditHotspot';
 import { useCmsEdit, useVisualEdit } from '../../context/CmsEditContext';
 import { visualCropProps } from '../../lib/mediaCrop';
@@ -96,9 +96,11 @@ export default function BlogPage() {
               <button
                 type="button"
                 onClick={() => openBlog(selectedPost)}
-                className="mb-4 text-[11px] font-semibold uppercase tracking-[0.14em] underline-offset-4 hover:underline"
+                aria-label="Editar artículo"
+                title="Editar artículo"
+                className="mb-4 inline-flex h-8 w-8 items-center justify-center bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
               >
-                Editar artículo
+                <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
               </button>
             )}
             <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-neutral-500">
